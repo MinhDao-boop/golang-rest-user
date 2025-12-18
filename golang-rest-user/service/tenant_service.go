@@ -59,9 +59,7 @@ func (s *tenantService) Create(req dto.CreateTenantRequest) (*models.Tenant, err
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
-	if err := s.repo.Create(tenant); err != nil {
-		return nil, err
-	}
+	dbCreated := false
 	// create tenant database
 	if err := database.CreateTenantDatabase(tenant.DBName); err != nil {
 		return nil, err
@@ -81,7 +79,16 @@ func (s *tenantService) Create(req dto.CreateTenantRequest) (*models.Tenant, err
 	}
 	// add tenant db to map
 	database.SetTenantDB(tenant.Code, tenantDB)
-
+	dbCreated = true
+	// save tenant record
+	if err := s.repo.Create(tenant); err != nil {
+		if dbCreated {
+			// cleanup tenant database if tenant record creation failed
+			database.RemoveTenantDB(tenant.Code)
+			database.DropTenantDatabase(tenant.DBName)
+		}
+		return nil, err
+	}
 	return tenant, nil
 }
 
@@ -137,10 +144,7 @@ func (s *tenantService) Update(id uint, req dto.UpdateTenantRequest) (*models.Te
 	tenant.DBHost = req.DBHost
 	tenant.DBPort = req.DBPort
 	tenant.UpdatedAt = time.Now().UTC()
-	if err := s.repo.Update(tenant); err != nil {
-		return nil, err
-	}
-
+	dbConnected := false
 	// connect to tenant database
 	newDB, err := database.ConnectTenantDB(*tenant)
 	if err != nil {
@@ -150,12 +154,22 @@ func (s *tenantService) Update(id uint, req dto.UpdateTenantRequest) (*models.Te
 	if err := pingDB(newDB); err != nil {
 		return nil, err
 	}
+	dbConnected = true
+	// save tenant record
+	if err := s.repo.Update(tenant); err != nil {
+		if dbConnected {
+			// cleanup new db connection if tenant record update failed
+			database.CloseTenantDB(newDB)
+		}
+		return nil, err
+	}
 	// swap tenant db in map
 	oldDB := database.SwapTenantDB(tenant.Code, newDB)
 	// close old db connection
 	if err := database.CloseTenantDB(oldDB); err != nil {
 		return nil, err
 	}
+
 	return tenant, nil
 }
 

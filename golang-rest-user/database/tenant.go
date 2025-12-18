@@ -104,3 +104,8 @@ func CloseTenantDB(oldDB *gorm.DB) error {
 	}
 	return nil
 }
+
+func DropTenantDatabase(dbName string) error {
+	var masterDB = DB
+	return masterDB.Exec("DROP DATABASE IF EXISTS " + dbName).Error
+}

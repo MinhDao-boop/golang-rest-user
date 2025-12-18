@@ -125,7 +125,6 @@ func (h *TenantHandler) UpdateTenant(c *gin.Context) {
 	uid := uint(id)
 	var req dto.UpdateTenantRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		//c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
 		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
 		return
 	}
