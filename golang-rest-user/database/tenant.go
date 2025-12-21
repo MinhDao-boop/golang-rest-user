@@ -5,6 +5,7 @@ import (
 	"log"
 	"time"
 
+	"golang-rest-user/config"
 	"golang-rest-user/models"
 	"golang-rest-user/security"
 
@@ -50,6 +51,49 @@ func InitTenantDBs(masterDB *gorm.DB) error {
 	}
 
 	return nil
+}
+
+func CheckConnectMasterDB(tenant models.Tenant) (bool, error) {
+	cfg := config.LoadConfig()
+	//Decrypt
+	dbUser, err := security.Decrypt(tenant.DBUser)
+	if err != nil {
+		return false, err
+	}
+	dbPass, err := security.Decrypt(tenant.DBPass)
+	if err != nil {
+		return false, err
+	}
+	dsn := fmt.Sprintf(
+		"%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=true",
+		dbUser,
+		dbPass,
+		tenant.DBHost,
+		tenant.DBPort,
+		cfg.DBName,
+	)
+	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	if err != nil {
+		log.Printf("❌ tenant %s connect to master DB failed", tenant.Code)
+		return false, err
+	}
+	sqlDB, err := db.DB()
+	if err != nil {
+		return false, err
+	}
+	defer sqlDB.Close()
+	return true, nil
+}
+
+func PingDB(db *gorm.DB) error {
+	sqlDB, err := db.DB()
+	if err != nil {
+		return err
+	}
+	sqlDB.SetConnMaxLifetime(5 * time.Minute)
+	sqlDB.SetMaxIdleConns(5)
+	sqlDB.SetMaxOpenConns(20)
+	return sqlDB.Ping()
 }
 
 func CreateTenantDatabase(dbName string) error {

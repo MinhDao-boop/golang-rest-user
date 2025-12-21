@@ -19,9 +19,7 @@ func TenantDBMiddleware() gin.HandlerFunc {
 
 		db, ok := database.GetTenantDB(tenantCode)
 		if !ok {
-			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{
-				"error": "tenant not found",
-			})
+			response.Error(c, response.CodeBadRequest, "Invalid tenant code", nil, http.StatusBadRequest)
 			return
 		}
 

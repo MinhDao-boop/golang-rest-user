@@ -57,8 +57,16 @@ func (s *tenantService) Create(req dto.CreateTenantRequest) (*models.Tenant, err
 		DBPort:    req.DBPort,
 		DBName:    req.DBName,
 		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
 	}
+	//check connect to master db
+	connected, err := database.CheckConnectMasterDB(*tenant)
+	if err != nil {
+		return nil, err
+	}
+	if !connected {
+		return nil, errors.New("cannot connect to master database with provided credentials")
+	}
+	// flag to indicate if tenant db is created
 	dbCreated := false
 	// create tenant database
 	if err := database.CreateTenantDatabase(tenant.DBName); err != nil {
@@ -74,7 +82,7 @@ func (s *tenantService) Create(req dto.CreateTenantRequest) (*models.Tenant, err
 		return nil, err
 	}
 	// ping tenant database
-	if err := pingDB(tenantDB); err != nil {
+	if err := database.PingDB(tenantDB); err != nil {
 		return nil, err
 	}
 	// add tenant db to map
@@ -144,6 +152,15 @@ func (s *tenantService) Update(id uint, req dto.UpdateTenantRequest) (*models.Te
 	tenant.DBHost = req.DBHost
 	tenant.DBPort = req.DBPort
 	tenant.UpdatedAt = time.Now().UTC()
+	//check connect to master db
+	connected, err := database.CheckConnectMasterDB(*tenant)
+	if err != nil {
+		return nil, err
+	}
+	if !connected {
+		return nil, errors.New("cannot connect to master database with provided credentials")
+	}
+	// flag to indicate if new db connection is established
 	dbConnected := false
 	// connect to tenant database
 	newDB, err := database.ConnectTenantDB(*tenant)
@@ -151,7 +168,7 @@ func (s *tenantService) Update(id uint, req dto.UpdateTenantRequest) (*models.Te
 		return nil, err
 	}
 	//ping new db connection
-	if err := pingDB(newDB); err != nil {
+	if err := database.PingDB(newDB); err != nil {
 		return nil, err
 	}
 	dbConnected = true
@@ -178,17 +195,6 @@ func needReconnect(oldTenant *models.Tenant, req dto.UpdateTenantRequest) bool {
 		oldTenant.DBPass != req.DBPass ||
 		oldTenant.DBHost != req.DBHost ||
 		oldTenant.DBPort != req.DBPort
-}
-
-func pingDB(db *gorm.DB) error {
-	sqlDB, err := db.DB()
-	if err != nil {
-		return err
-	}
-	sqlDB.SetConnMaxLifetime(5 * time.Minute)
-	sqlDB.SetMaxIdleConns(5)
-	sqlDB.SetMaxOpenConns(20)
-	return sqlDB.Ping()
 }
 
 func (s *tenantService) Delete(id uint) error {

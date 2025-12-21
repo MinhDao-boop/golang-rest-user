@@ -22,8 +22,6 @@ type TenantResponse struct {
 	ID        uint   `json:"id"`
 	Code      string `json:"code"`
 	Name      string `json:"name"`
-	DBUser    string `json:"db_user"`
-	DBPass    string `json:"db_pass"`
 	DBHost    string `json:"db_host"`
 	DBPort    string `json:"db_port"`
 	DBName    string `json:"db_name"`
