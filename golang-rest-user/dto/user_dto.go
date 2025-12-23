@@ -13,6 +13,14 @@ type LoginRequest struct {
 	Password string `json:"password" binding:"required,min=6"`
 }
 
+type LogoutRequest struct {
+	RefreshToken string `json:"refresh_token" binding:"required"`
+}
+
+type RefreshTokenRequest struct {
+	RefreshToken string `json:"refresh_token" binding:"required"`
+}
+
 type UpdateUserRequest struct {
 	FullName string `json:"full_name" binding:"required"`
 	Phone    string `json:"phone" binding:"omitempty"`

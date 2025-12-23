@@ -43,10 +43,18 @@ func main() {
 		return repository.NewUserRepo(db), nil
 	}
 
+	refreshTokenRepoFactory := func(tenantCode string) (repository.RefreshTokenRepo, error) {
+		db, ok := database.GetTenantDB(tenantCode)
+		if !ok {
+			return nil, err
+		}
+		return repository.NewRefreshTokenRepo(db), nil
+	}
+
 	jwtCfg := security.LoadJWTConfig()
 	jwtManager := security.NewManager(jwtCfg)
 
-	authService := service.NewAuthService(userRepoFactory, jwtManager)
+	authService := service.NewAuthService(userRepoFactory, refreshTokenRepoFactory, jwtManager)
 	authHandler := handler.NewAuthHandler(authService)
 
 	routes.RegisterRoutes(r, userHandler, tntHandler, authHandler)

@@ -31,13 +31,7 @@ func TenantContextMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		response.Error(
-			c,
-			response.CodeBadRequest,
-			"tenant code is required",
-			nil,
-			http.StatusBadRequest,
-		)
+		response.Error(c, response.CodeBadRequest, "tenant code is required", nil, http.StatusBadRequest)
 	}
 }
 

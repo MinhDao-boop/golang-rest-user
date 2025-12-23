@@ -16,6 +16,8 @@ func RegisterRoutes(r *gin.Engine, u *handler.UserHandler, t *handler.TenantHand
 		{
 			auth.POST("/register", a.Register) // POST /api/v1/auth/register
 			auth.POST("/login", a.Login)       // POST /api/v1/auth/login
+			auth.POST("/logout", a.Logout)     // POST /api/v1/auth/logout
+			auth.POST("refresh", a.Refresh)    // POST /api/v1/auth/refresh
 		}
 		tenants := v1.Group("/tenants")
 		{

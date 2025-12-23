@@ -19,7 +19,7 @@ func AuthMiddleware(jwtManager *security.Manager) gin.HandlerFunc {
 
 		tokenStr := strings.TrimPrefix(auth, "Bearer ")
 
-		claims, err := jwtManager.ParseAccessToken(tokenStr)
+		claims, err := jwtManager.ParseToken(tokenStr)
 		if err != nil {
 			response.Error(c, response.CodeBadRequest, "Unauthorized", nil, http.StatusUnauthorized)
 			return

@@ -6,15 +6,17 @@ import (
 )
 
 type JWTConfig struct {
-	SecrteKey      []byte
-	AccessTokenTTL time.Duration
-	Issuer         string
+	SecretKey       []byte
+	AccessTokenTTL  time.Duration
+	RefreshTokenTTL time.Duration
+	Issuer          string
 }
 
 func LoadJWTConfig() *JWTConfig {
 	return &JWTConfig{
-		SecrteKey:      []byte(os.Getenv("JWT_SECRET_KEY")),
-		AccessTokenTTL: time.Hour * 24,
-		Issuer:         "golang-rest-user",
+		SecretKey:       []byte(os.Getenv("JWT_SECRET_KEY")),
+		AccessTokenTTL:  time.Minute * 15,
+		RefreshTokenTTL: time.Hour * 24 * 7,
+		Issuer:          "golang-rest-user",
 	}
 }
