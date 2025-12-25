@@ -21,7 +21,11 @@ func NewAuthHandler() *AuthHandler {
 }
 
 func getAuthService(c *gin.Context) service.AuthService {
-	db := c.MustGet("TENANT_DB").(*gorm.DB)
+	dbAny, ok := c.Get("TENANT_DB")
+	if !ok {
+		return nil
+	}
+	db := dbAny.(*gorm.DB)
 	userRepo := repository.NewUserRepo(db)
 	refreshTokenRepo := repository.NewRefreshTokenRepo(db)
 	jwtConfig := security.LoadJWTConfig()
@@ -33,10 +37,13 @@ func getAuthService(c *gin.Context) service.AuthService {
 // POST /auth/register
 func (h *AuthHandler) Register(c *gin.Context) {
 	authSvc := getAuthService(c)
+	if authSvc == nil {
+		return
+	}
 	var req dto.CreateUserRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, response.CodeBadRequest, "invalid request", err, http.StatusBadRequest)
+		response.Error(c, response.CodeBadRequest, "invalid request", nil, http.StatusBadRequest)
 		return
 	}
 
@@ -52,9 +59,12 @@ func (h *AuthHandler) Register(c *gin.Context) {
 // POST /auth/login
 func (h *AuthHandler) Login(c *gin.Context) {
 	authSvc := getAuthService(c)
+	if authSvc == nil {
+		return
+	}
 	var req dto.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, response.CodeBadRequest, err.Error(), err, http.StatusBadRequest)
+		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
 		return
 	}
 
@@ -72,6 +82,9 @@ func (h *AuthHandler) Login(c *gin.Context) {
 // POST /auth/refresh
 func (h *AuthHandler) Refresh(c *gin.Context) {
 	authSvc := getAuthService(c)
+	if authSvc == nil {
+		return
+	}
 	var req dto.RefreshTokenRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
@@ -89,6 +102,9 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 // POST /auth/logout
 func (h *AuthHandler) Logout(c *gin.Context) {
 	authSvc := getAuthService(c)
+	if authSvc == nil {
+		return
+	}
 	var req dto.LogoutRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)

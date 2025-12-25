@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"golang-rest-user/dto"
 	"golang-rest-user/response"
 	"golang-rest-user/service"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 type TenantHandler struct {
@@ -34,8 +36,7 @@ func (h *TenantHandler) ListTenantResponse(c *gin.Context) {
 
 	tenants, total, err := h.svc.List(page, pageSize, search)
 	if err != nil {
-		//c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
-		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
+		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusInternalServerError)
 	}
 
 	resp := []dto.TenantResponse{}
@@ -60,7 +61,6 @@ func (h *TenantHandler) ListTenantResponse(c *gin.Context) {
 func (h *TenantHandler) CreateTenantRequest(c *gin.Context) {
 	var req dto.CreateTenantRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		//c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
 		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
 		return
 	}
@@ -68,12 +68,10 @@ func (h *TenantHandler) CreateTenantRequest(c *gin.Context) {
 	tenant, err := h.svc.Create(req)
 	if err != nil {
 		if strings.Contains(err.Error(), "exists") {
-			//c.JSON(http.StatusConflict, gin.H{"success": false, "error": err.Error()})
-			response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
+			response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusConflict)
 			return
 		}
-		//c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
-		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
+		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusInternalServerError)
 		return
 	}
 
@@ -91,14 +89,19 @@ func (h *TenantHandler) CreateTenantRequest(c *gin.Context) {
 	})
 }
 
-// GET /tenants/:id
-func (h *TenantHandler) GetByTenantID(c *gin.Context) {
-	id, _ := strconv.Atoi(c.Param("id"))
-	uid := uint(id)
-	tenant, err := h.svc.GetByID(uid)
+// GET /tenants/:code
+func (h *TenantHandler) GetByTenantCode(c *gin.Context) {
+	code := c.Param("code")
+	if code == "" {
+		response.Error(c, response.CodeBadRequest, "tenant code is required", nil, http.StatusBadRequest)
+	}
+	tenant, err := h.svc.GetByTenantCode(code)
 	if err != nil {
-		//c.JSON(http.StatusNotFound, gin.H{"success": false, "error": err.Error()})
-		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			response.Error(c, response.CodeBadRequest, "tenant not found", nil, http.StatusNotFound)
+			return
+		}
+		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusInternalServerError)
 		return
 	}
 	response.Success(c, dto.TenantResponse{
@@ -113,20 +116,21 @@ func (h *TenantHandler) GetByTenantID(c *gin.Context) {
 	})
 }
 
-// PUT /tenants/:id
+// PUT /tenants/:code
 func (h *TenantHandler) UpdateTenant(c *gin.Context) {
-	id, _ := strconv.Atoi(c.Param("id"))
-	uid := uint(id)
+	code := c.Param("code")
+	if code == "" {
+		response.Error(c, response.CodeBadRequest, "tenant code is required", nil, http.StatusBadRequest)
+	}
 	var req dto.UpdateTenantRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
 		return
 	}
 
-	tenant, err := h.svc.Update(uid, req)
+	tenant, err := h.svc.Update(code, req)
 	if err != nil {
-		//c.JSON(http.StatusNotFound, gin.H{"success": false, "error": err.Error()})
-		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
+		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusNotFound)
 		return
 	}
 
@@ -142,24 +146,26 @@ func (h *TenantHandler) UpdateTenant(c *gin.Context) {
 	})
 }
 
-// DELETE /tenants/:id
+// DELETE /tenants/:code
 func (h *TenantHandler) DeleteTenant(c *gin.Context) {
-	id, _ := strconv.Atoi(c.Param("id"))
-	uid := uint(id)
-	if err := h.svc.Delete(uid); err != nil {
-		//c.JSON(http.StatusNotFound, gin.H{"success": false, "error": err.Error()})
-		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
+	code := c.Param("code")
+	if code == "" {
+		response.Error(c, response.CodeBadRequest, "tenant code is required", nil, http.StatusBadRequest)
+	}
+	if err := h.svc.Delete(code); err != nil {
+		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusNotFound)
 		return
 	}
-	//c.Status(http.StatusNoContent)
 	response.Success(c, gin.H{"deleted": true})
 }
 
-// PUT /tenants/deleted/:id
+// PUT /tenants/deleted/:code
 func (h *TenantHandler) RecoverDeleted(c *gin.Context) {
-	id, _ := strconv.Atoi(c.Param("id"))
-	uid := uint(id)
-	tenant, err := h.svc.RecoverDeleted(uid)
+	code := c.Param("code")
+	if code == "" {
+		response.Error(c, response.CodeBadRequest, "tenant code is required", nil, http.StatusBadRequest)
+	}
+	tenant, err := h.svc.RecoverDeleted(code)
 	if err != nil {
 		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
 	}

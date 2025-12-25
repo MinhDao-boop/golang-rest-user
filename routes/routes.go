@@ -13,23 +13,23 @@ func RegisterRoutes(r *gin.Engine, u *handler.UserHandler, t *handler.TenantHand
 	{
 		tenants := v1.Group("/tenants")
 		{
-			tenants.GET("", t.ListTenantResponse)         // GET /api/v1/tenants
-			tenants.POST("", t.CreateTenantRequest)       // POST /api/v1/tenants
-			tenants.GET("/:id", t.GetByTenantID)          // GET /api/v1/tenants/:id
-			tenants.PUT("/:id", t.UpdateTenant)           // PUT /api/v1/tenants/:id
-			tenants.DELETE("/:id", t.DeleteTenant)        // DELETE /api/v1/tenants/:id
-			tenants.PUT("/deleted/:id", t.RecoverDeleted) // PUT /tenants/deleted/:id
+			tenants.GET("", t.ListTenantResponse)           // GET /api/v1/tenants
+			tenants.POST("", t.CreateTenantRequest)         // POST /api/v1/tenants
+			tenants.GET("/:code", t.GetByTenantCode)        // GET /api/v1/tenants/:code
+			tenants.PUT("/:code", t.UpdateTenant)           // PUT /api/v1/tenants/:code
+			tenants.DELETE("/:code", t.DeleteTenant)        // DELETE /api/v1/tenants/:code
+			tenants.PUT("/deleted/:code", t.RecoverDeleted) // PUT /tenants/deleted/:code
 		}
 
 		users := v1.Group("/users")
 		users.Use(middleware.TenantDBMiddleware())
 		{
-			users.GET("", u.ListUsersResponse)     // GET /api/v1/users
-			users.POST("", u.CreateUser)           // POST /api/v1/users
-			users.DELETE("", u.DeleteManyUsers)    // DELETE /api/v1/users?ids=1,2,3
-			users.GET("/:id", u.GetByUserID)       // GET /api/v1/users/:id
-			users.PUT("/:id", u.UpdateUserRequest) // PUT /api/v1/users/:id
-			users.DELETE("/:id", u.DeleteUser)     // DELETE /api/v1/users/:id
+			users.GET("", u.ListUsersResponse)       // GET /api/v1/users
+			users.POST("", u.CreateUser)             // POST /api/v1/users
+			users.DELETE("", u.DeleteManyUsers)      // DELETE /api/v1/users?uuids=1b0f0fe4-8710-4518-b8bc-7f1e52b280e4,1c8edc4f-b1a0-4252-808b-682eb76551ad,...
+			users.GET("/:uuid", u.GetByUserUUID)     // GET /api/v1/users/:uuid
+			users.PUT("/:uuid", u.UpdateUserRequest) // PUT /api/v1/users/:uuid
+			users.DELETE("/:uuid", u.DeleteUser)     // DELETE /api/v1/users/:uuid
 		}
 		auth := v1.Group("/auth")
 		auth.Use(middleware.TenantDBMiddleware())

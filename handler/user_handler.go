@@ -22,7 +22,11 @@ func NewUserHandler() *UserHandler {
 }
 
 func getUserService(c *gin.Context) service.UserService {
-	db := c.MustGet("TENANT_DB").(*gorm.DB)
+	dbAny, ok := c.Get("TENANT_DB")
+	if !ok {
+		return nil
+	}
+	db := dbAny.(*gorm.DB)
 	userRepo := repository.NewUserRepo(db)
 	userSvc := service.NewUserService(userRepo)
 	return userSvc
@@ -31,6 +35,9 @@ func getUserService(c *gin.Context) service.UserService {
 // GET /users?page=1&page_size=10&search=...
 func (h *UserHandler) ListUsersResponse(c *gin.Context) {
 	svc := getUserService(c)
+	if svc == nil {
+		return
+	}
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
 	if page <= 0 {
@@ -43,15 +50,14 @@ func (h *UserHandler) ListUsersResponse(c *gin.Context) {
 
 	users, total, err := svc.List(page, pageSize, search)
 	if err != nil {
-		//c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
+		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusInternalServerError)
 		return
 	}
 
 	resp := []dto.UserResponse{}
 	for _, u := range users {
 		resp = append(resp, dto.UserResponse{
-			ID: u.ID, Username: u.Username, Password: u.Password, FullName: u.FullName, Phone: u.Phone, Position: u.Position,
+			ID: u.ID, Uuid: u.Uuid, Username: u.Username, Password: u.Password, FullName: u.FullName, Phone: u.Phone, Position: u.Position,
 			CreatedAt: u.CreatedAt.Format(time.RFC3339), UpdatedAt: u.UpdatedAt.Format(time.RFC3339),
 		})
 	}
@@ -64,9 +70,11 @@ func (h *UserHandler) ListUsersResponse(c *gin.Context) {
 // POST /users
 func (h *UserHandler) CreateUser(c *gin.Context) {
 	svc := getUserService(c)
+	if svc == nil {
+		return
+	}
 	var req dto.CreateUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		//c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
 		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
 		return
 	}
@@ -74,113 +82,105 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 	user, err := svc.Create(req)
 	if err != nil {
 		if strings.Contains(err.Error(), "exists") {
-			//c.JSON(http.StatusConflict, gin.H{"success": false, "error": "username already exists"})
-			response.Error(c, response.CodeBadRequest, "username already exists", nil, http.StatusBadRequest)
+			response.Error(c, response.CodeBadRequest, "username already exists", nil, http.StatusConflict)
 			return
 		}
-		//c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
-		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
+		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusInternalServerError)
 		return
 	}
 
 	location := c.Request.URL.Path + "/" + strconv.FormatUint(uint64(user.ID), 10)
 	c.Header("Location", location)
 	response.Success(c, dto.UserResponse{
-		ID: user.ID, Username: user.Username, FullName: user.FullName, Phone: user.Phone, Position: user.Position,
-		CreatedAt: user.CreatedAt.Format(time.RFC3339), UpdatedAt: user.UpdatedAt.Format(time.RFC3339),
+		ID: user.ID, Uuid: user.Uuid, Username: user.Username, Password: user.Password, FullName: user.FullName, Phone: user.Phone, Position: user.Position,
+		CreatedAt: user.CreatedAt.Format(time.RFC3339),
 	})
 }
 
-// GET /users/:id
-func (h *UserHandler) GetByUserID(c *gin.Context) {
+// GET /users/:uuid
+func (h *UserHandler) GetByUserUUID(c *gin.Context) {
 	svc := getUserService(c)
-	id64, _ := strconv.ParseUint(c.Param("id"), 10, 64)
-	id := uint(id64)
-	user, err := svc.GetByID(id)
+	if svc == nil {
+		return
+	}
+	uuid := c.Param("uuid")
+	user, err := svc.GetByUUID(uuid)
 	if err != nil {
-		//c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "user not found"})
 		response.Error(c, response.CodeBadRequest, "user not found", nil, http.StatusBadRequest)
 		return
 	}
 	response.Success(c, dto.UserResponse{
-		ID: user.ID, Username: user.Username, FullName: user.FullName, Phone: user.Phone, Position: user.Position,
+		ID: user.ID, Uuid: user.Uuid, Username: user.Username, Password: user.Password, FullName: user.FullName, Phone: user.Phone, Position: user.Position,
 		CreatedAt: user.CreatedAt.Format(time.RFC3339), UpdatedAt: user.UpdatedAt.Format(time.RFC3339),
 	})
 }
 
-// PUT /users/:id
+// PUT /users/:uuid
 func (h *UserHandler) UpdateUserRequest(c *gin.Context) {
 	svc := getUserService(c)
-	id64, _ := strconv.ParseUint(c.Param("id"), 10, 64)
-	id := uint(id64)
+	if svc == nil {
+		return
+	}
+	uuid := c.Param("uuid")
 
 	var req dto.UpdateUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		//c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
 		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
 		return
 	}
 
-	user, err := svc.Update(id, req)
+	user, err := svc.Update(uuid, req)
 	if err != nil {
-		//c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "user not found"})
-		response.Error(c, response.CodeBadRequest, "user not found", nil, http.StatusBadRequest)
+		response.Error(c, response.CodeBadRequest, "user not found", nil, http.StatusNotFound)
 		return
 	}
 	response.Success(c, dto.UserResponse{
-		ID: user.ID, Username: user.Username, FullName: user.FullName, Phone: user.Phone, Position: user.Position,
+		ID: user.ID, Uuid: user.Uuid, Username: user.Username, Password: user.Password, FullName: user.FullName, Phone: user.Phone, Position: user.Position,
 		CreatedAt: user.CreatedAt.Format(time.RFC3339), UpdatedAt: user.UpdatedAt.Format(time.RFC3339),
 	})
 }
 
-// DELETE /users/:id
+// DELETE /users/:uuid
 func (h *UserHandler) DeleteUser(c *gin.Context) {
 	svc := getUserService(c)
-	id64, _ := strconv.ParseUint(c.Param("id"), 10, 64)
-	id := uint(id64)
-	if err := svc.Delete(id); err != nil {
-		//c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "user not found"})
-		response.Error(c, response.CodeBadRequest, "user not found", nil, http.StatusBadRequest)
+	if svc == nil {
 		return
 	}
-	//c.Status(http.StatusNoContent)
+	uuid := c.Param("uuid")
+	if err := svc.Delete(uuid); err != nil {
+		response.Error(c, response.CodeBadRequest, "user not found", nil, http.StatusNotFound)
+		return
+	}
 	response.Success(c, gin.H{"deleted": true})
 }
 
-// DELETE /users?ids=1,2,3
+// DELETE /users?uuids=1b0f0fe4-8710-4518-b8bc-7f1e52b280e4,1c8edc4f-b1a0-4252-808b-682eb76551ad,...
 func (h *UserHandler) DeleteManyUsers(c *gin.Context) {
 	svc := getUserService(c)
-	idsParam := c.Query("ids")
-	if idsParam == "" {
-		//c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "ids query param required"})
+	if svc == nil {
+		return
+	}
+	uuidsParam := c.Query("uuids")
+	if uuidsParam == "" {
 		response.Error(c, response.CodeBadRequest, "ids query param required", nil, http.StatusBadRequest)
 		return
 	}
-	parts := strings.Split(idsParam, ",")
-	ids := []uint{}
+	parts := strings.Split(uuidsParam, ",")
+	uuids := []string{}
 	for _, p := range parts {
 		if p == "" {
 			continue
 		}
-		v, err := strconv.ParseUint(strings.TrimSpace(p), 10, 64)
-		if err != nil {
-			//c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid id in ids"})
-			response.Error(c, response.CodeBadRequest, "invalid id in ids", nil, http.StatusBadRequest)
-			return
-		}
-		ids = append(ids, uint(v))
+		uuids = append(uuids, p)
 	}
-	deleted, err := svc.DeleteMany(ids)
+	deleted, err := svc.DeleteMany(uuids)
 	if err != nil {
-		//c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
-		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
+		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusInternalServerError)
 		return
 	}
 	if deleted == 0 {
-		//c.Status(http.StatusNoContent)
-		response.Error(c, response.CodeBadRequest, "no users deleted", nil, http.StatusBadRequest)
+		response.Error(c, response.CodeBadRequest, "no users deleted", nil, http.StatusNoContent)
 		return
 	}
-	//c.JSON(http.StatusOK, gin.H{"success": true, "deleted": deleted})
 	response.Success(c, gin.H{"deleted": deleted})
 }

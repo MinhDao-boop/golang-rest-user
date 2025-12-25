@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"errors"
 	"strings"
 
 	"golang-rest-user/models"
@@ -16,6 +17,7 @@ type UserRepo interface {
 	DeleteByID(id uint) error
 	DeleteByIDs(ids []uint) (deleted int64, err error)
 	GetByUsername(username string) (*models.User, error)
+	GetByUUID(string) (*models.User, error)
 }
 
 type userRepo struct {
@@ -33,6 +35,9 @@ func (r *userRepo) Create(user *models.User) error {
 func (r *userRepo) GetByID(id uint) (*models.User, error) {
 	var u models.User
 	if err := r.db.First(&u, id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, err
+		}
 		return nil, err
 	}
 	return &u, nil
@@ -72,4 +77,15 @@ func (r *userRepo) DeleteByID(id uint) error {
 func (r *userRepo) DeleteByIDs(ids []uint) (int64, error) {
 	res := r.db.Delete(&models.User{}, ids)
 	return res.RowsAffected, res.Error
+}
+
+func (r *userRepo) GetByUUID(uuid string) (*models.User, error) {
+	var u models.User
+	if err := r.db.Where("uuid = ?", uuid).First(&u).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, err
+		}
+		return nil, err
+	}
+	return &u, nil
 }

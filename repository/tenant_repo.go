@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"errors"
 	"strings"
 
 	"golang-rest-user/models"
@@ -16,7 +17,7 @@ type TenantRepo interface {
 	DeleteByID(id uint) error
 	GetByTenantCode(tenantCode string) (*models.Tenant, error)
 	RecoverDeleted(id uint) error
-	FindDeletedByID(id uint) (*models.Tenant, error)
+	FindDeletedByCode(string) (*models.Tenant, error)
 }
 
 type tenantRepo struct {
@@ -42,6 +43,9 @@ func (r *tenantRepo) GetByID(id uint) (*models.Tenant, error) {
 func (r *tenantRepo) GetByTenantCode(tenantCode string) (*models.Tenant, error) {
 	var t models.Tenant
 	if err := r.db.Where("code = ?", tenantCode).First(&t).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, err
+		}
 		return nil, err
 	}
 	return &t, nil
@@ -76,10 +80,10 @@ func (r *tenantRepo) RecoverDeleted(id uint) error {
 		Update("deleted_at", nil).Error
 }
 
-func (r *tenantRepo) FindDeletedByID(id uint) (*models.Tenant, error) {
+func (r *tenantRepo) FindDeletedByCode(tenantCode string) (*models.Tenant, error) {
 	var tenant models.Tenant
 
-	err := r.db.Unscoped().Where("deleted_at IS NOT NULL").First(&tenant, id).Error
+	err := r.db.Unscoped().Where("deleted_at IS NOT NULL").First(&tenant, tenantCode).Error
 	if err != nil {
 		return nil, err
 	}

@@ -7,9 +7,9 @@ import (
 )
 
 type Tenant struct {
-	ID        uint           `gorm:"primaryKey; autoIncrement:false" json:"id"`
+	ID        uint           `gorm:"primaryKey" json:"id"`
 	Code      string         `gorm:"size:45; uniqueIndex" json:"code"`
-	Name      string         `gorm:"size:225; not null" json:"name"`
+	Name      string         `gorm:"size:255; not null" json:"name"`
 	DBUser    string         `gorm:"size:50" json:"db_user"`
 	DBPass    string         `gorm:"size:50" json:"db_pass"`
 	DBHost    string         `gorm:"size:50" json:"db_host"`

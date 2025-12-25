@@ -16,11 +16,11 @@ import (
 
 type UserService interface {
 	Create(dto.CreateUserRequest) (*models.User, error)
-	GetByID(uint) (*models.User, error)
+	GetByUUID(string) (*models.User, error)
 	List(page, pageSize int, search string) ([]models.User, int64, error)
-	Update(id uint, req dto.UpdateUserRequest) (*models.User, error)
-	Delete(id uint) error
-	DeleteMany(ids []uint) (int64, error)
+	Update(uuid string, req dto.UpdateUserRequest) (*models.User, error)
+	Delete(string) error
+	DeleteMany([]string) (int64, error)
 }
 
 type userService struct {
@@ -47,14 +47,13 @@ func (s *userService) Create(req dto.CreateUserRequest) (*models.User, error) {
 	}
 
 	user := &models.User{
-		ID:        uint(uuid.New().ID()),
+		Uuid:      uuid.NewString(),
 		Username:  req.Username,
 		Password:  passEncrypted,
 		FullName:  req.FullName,
 		Phone:     req.Phone,
 		Position:  req.Position,
-		CreatedAt: time.Now().UTC(),
-		UpdatedAt: time.Now().UTC(),
+		CreatedAt: time.Now(),
 	}
 
 	if err := s.repo.Create(user); err != nil {
@@ -63,16 +62,20 @@ func (s *userService) Create(req dto.CreateUserRequest) (*models.User, error) {
 	return user, nil
 }
 
-func (s *userService) GetByID(id uint) (*models.User, error) {
-	return s.repo.GetByID(id)
+func (s *userService) GetByUUID(uuid string) (*models.User, error) {
+	user, err := s.repo.GetByUUID(uuid)
+	if err != nil {
+		return nil, err
+	}
+	return user, nil
 }
 
 func (s *userService) List(page, pageSize int, search string) ([]models.User, int64, error) {
 	return s.repo.GetList(page, pageSize, search)
 }
 
-func (s *userService) Update(id uint, req dto.UpdateUserRequest) (*models.User, error) {
-	user, err := s.repo.GetByID(id)
+func (s *userService) Update(uuid string, req dto.UpdateUserRequest) (*models.User, error) {
+	user, err := s.repo.GetByUUID(uuid)
 	if err != nil {
 		return nil, err
 	}
@@ -87,10 +90,25 @@ func (s *userService) Update(id uint, req dto.UpdateUserRequest) (*models.User, 
 	return user, nil
 }
 
-func (s *userService) Delete(id uint) error {
-	return s.repo.DeleteByID(id)
+func (s *userService) Delete(uuid string) error {
+	user, err := s.repo.GetByUUID(uuid)
+	if err != nil {
+		return err
+	}
+	return s.repo.DeleteByID(user.ID)
 }
 
-func (s *userService) DeleteMany(ids []uint) (int64, error) {
+func (s *userService) DeleteMany(uuids []string) (int64, error) {
+	ids := []uint{}
+	for _, uuid := range uuids {
+		if uuid == "" {
+			continue
+		}
+		user, err := s.repo.GetByUUID(uuid)
+		if err != nil {
+			return 0, err
+		}
+		ids = append(ids, user.ID)
+	}
 	return s.repo.DeleteByIDs(ids)
 }

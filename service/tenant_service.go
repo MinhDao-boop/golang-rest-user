@@ -2,6 +2,8 @@ package service
 
 import (
 	"errors"
+	"strings"
+
 	//"fmt"
 	"golang-rest-user/database"
 	"golang-rest-user/dto"
@@ -10,17 +12,16 @@ import (
 	"golang-rest-user/security"
 	"time"
 
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
 type TenantService interface {
 	Create(dto.CreateTenantRequest) (*models.Tenant, error)
-	GetByID(uint) (*models.Tenant, error)
+	GetByTenantCode(string) (*models.Tenant, error)
 	List(page, pageSize int, search string) ([]models.Tenant, int64, error)
-	Update(id uint, req dto.UpdateTenantRequest) (*models.Tenant, error)
-	Delete(id uint) error
-	RecoverDeleted(id uint) (*models.Tenant, error)
+	Update(tenantCode string, req dto.UpdateTenantRequest) (*models.Tenant, error)
+	Delete(string) error
+	RecoverDeleted(string) (*models.Tenant, error)
 }
 
 type tenantService struct {
@@ -51,7 +52,6 @@ func (s *tenantService) Create(req dto.CreateTenantRequest) (*models.Tenant, err
 		return nil, err
 	}
 	tenant := &models.Tenant{
-		ID:        uint(uuid.New().ID()),
 		Code:      req.Code,
 		Name:      req.Name,
 		DBUser:    encryptedUser,
@@ -100,16 +100,21 @@ func (s *tenantService) Create(req dto.CreateTenantRequest) (*models.Tenant, err
 	return tenant, nil
 }
 
-func (s *tenantService) GetByID(id uint) (*models.Tenant, error) {
-	return s.repo.GetByID(id)
+func (s *tenantService) GetByTenantCode(tenantCode string) (*models.Tenant, error) {
+	tenantCode = strings.TrimSpace(strings.ToLower(tenantCode))
+	tenant, err := s.repo.GetByTenantCode(tenantCode)
+	if err != nil {
+		return nil, err
+	}
+	return tenant, nil
 }
 
 func (s *tenantService) List(page, pageSize int, search string) ([]models.Tenant, int64, error) {
 	return s.repo.GetList(page, pageSize, search)
 }
 
-func (s *tenantService) Update(id uint, req dto.UpdateTenantRequest) (*models.Tenant, error) {
-	tenant, err := s.repo.GetByID(id)
+func (s *tenantService) Update(tenantCode string, req dto.UpdateTenantRequest) (*models.Tenant, error) {
+	tenant, err := s.repo.GetByTenantCode(tenantCode)
 	if err != nil {
 		return nil, err
 	}
@@ -194,8 +199,8 @@ func needReconnect(oldTenant *models.Tenant, req dto.UpdateTenantRequest) bool {
 		oldTenant.DBPort != req.DBPort
 }
 
-func (s *tenantService) Delete(id uint) error {
-	tenant, err := s.repo.GetByID(id)
+func (s *tenantService) Delete(tenantCode string) error {
+	tenant, err := s.repo.GetByTenantCode(tenantCode)
 	if err != nil {
 		return err
 	}
@@ -205,11 +210,11 @@ func (s *tenantService) Delete(id uint) error {
 	if err := database.CloseTenantDB(oldDB); err != nil {
 		return err
 	}
-	return s.repo.DeleteByID(id)
+	return s.repo.DeleteByID(tenant.ID)
 }
 
-func (s *tenantService) RecoverDeleted(id uint) (*models.Tenant, error) {
-	tenant, err := s.repo.FindDeletedByID(id)
+func (s *tenantService) RecoverDeleted(tenantCode string) (*models.Tenant, error) {
+	tenant, err := s.repo.FindDeletedByCode(tenantCode)
 	if err != nil {
 		return nil, err
 	}
@@ -240,6 +245,6 @@ func (s *tenantService) RecoverDeleted(id uint) (*models.Tenant, error) {
 		// add tenant db to map
 		database.SetTenantDB(tenant.Code, tenantDB)
 	}
-	s.repo.RecoverDeleted(id)
+	s.repo.RecoverDeleted(tenant.ID)
 	return tenant, nil
 }
