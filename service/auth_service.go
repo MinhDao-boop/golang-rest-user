@@ -85,8 +85,9 @@ func (s *authService) Login(tenantCode string, req dto.LoginRequest) (map[string
 	}
 
 	hash := hashToken(rToken.Token)
+	ttl := time.Duration(rToken.ExpiresIn) * time.Second
 
-	err = s.refreshTokenRepo.Create(hash, user.ID, time.Duration(rToken.ExpiresIn))
+	err = s.refreshTokenRepo.Create(hash, user.ID, tenantCode, ttl)
 	if err != nil {
 		return nil, err
 	}
@@ -125,7 +126,10 @@ func (s *authService) Refresh(rToken string) (map[string]string, error) {
 	newAToken, _ := s.jwtManager.GenerateAccessToken(claims.UserID, user.Username, claims.TenantCode)
 	newRToken, _ := s.jwtManager.GenerateRefreshToken(claims.UserID, claims.TenantCode)
 
-	if err = s.refreshTokenRepo.Create(hashToken(newRToken.Token), claims.UserID, time.Duration(newRToken.ExpiresIn)); err != nil {
+	hash := hashToken(newRToken.Token)
+	ttl := time.Duration(newRToken.ExpiresIn) * time.Second
+
+	if err = s.refreshTokenRepo.Create(hash, claims.UserID, claims.TenantCode, ttl); err != nil {
 		return nil, err
 	}
 
