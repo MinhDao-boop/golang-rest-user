@@ -24,11 +24,11 @@ type AuthService interface {
 
 type authService struct {
 	userRepo         repository.UserRepo
-	refreshTokenRepo repository.RefreshTokenRepo
+	refreshTokenRepo repository.RefreshTokenRedis
 	jwtManager       *security.Manager
 }
 
-func NewAuthService(userRepo repository.UserRepo, refreshTokenRepo repository.RefreshTokenRepo,
+func NewAuthService(userRepo repository.UserRepo, refreshTokenRepo repository.RefreshTokenRedis,
 	jwtManager *security.Manager) AuthService {
 	return &authService{
 		userRepo:         userRepo,
@@ -86,19 +86,14 @@ func (s *authService) Login(tenantCode string, req dto.LoginRequest) (map[string
 
 	hash := hashToken(rToken.Token)
 
-	err = s.refreshTokenRepo.Create(&models.RefreshToken{
-		ID:        uuid.NewString(),
-		UserID:    user.ID,
-		TokenHash: hash,
-		ExpiresAt: time.Now().UTC().Add(time.Hour * 24 * 7),
-	})
+	err = s.refreshTokenRepo.Create(hash, user.ID, time.Duration(rToken.ExpiresIn))
 	if err != nil {
 		return nil, err
 	}
 
 	return map[string]string{
 		"access_token":       aToken.Token,
-		"expires_in":         strconv.FormatInt(aToken.ExpiresIn, 10),
+		"access_expires_in":  strconv.FormatInt(aToken.ExpiresIn, 10),
 		"refresh_token":      rToken.Token,
 		"refresh_expires_in": strconv.FormatInt(rToken.ExpiresIn, 10),
 	}, nil
@@ -116,13 +111,12 @@ func (s *authService) Refresh(rToken string) (map[string]string, error) {
 		return nil, errors.New("invalid refresh token")
 	}
 
-	storedRToken, err := s.refreshTokenRepo.FindValidByHash(hashToken(rToken))
-	if err != nil {
+	if err := s.refreshTokenRepo.FindValidByHash(hashToken(rToken)); err != nil {
 		return nil, errors.New("refresh token revoked")
 	}
 
 	//revoke old refresh token
-	if err = s.refreshTokenRepo.Revoke(storedRToken.ID); err != nil {
+	if err = s.refreshTokenRepo.Revoke(hashToken(rToken)); err != nil {
 		return nil, err
 	}
 
@@ -131,18 +125,13 @@ func (s *authService) Refresh(rToken string) (map[string]string, error) {
 	newAToken, _ := s.jwtManager.GenerateAccessToken(claims.UserID, user.Username, claims.TenantCode)
 	newRToken, _ := s.jwtManager.GenerateRefreshToken(claims.UserID, claims.TenantCode)
 
-	if err = s.refreshTokenRepo.Create(&models.RefreshToken{
-		ID:        uuid.NewString(),
-		UserID:    claims.UserID,
-		TokenHash: hashToken(newRToken.Token),
-		ExpiresAt: time.Now().UTC().Add(time.Hour * 24 * 7),
-	}); err != nil {
+	if err = s.refreshTokenRepo.Create(hashToken(newRToken.Token), claims.UserID, time.Duration(newRToken.ExpiresIn)); err != nil {
 		return nil, err
 	}
 
 	return map[string]string{
 		"access_token":       newAToken.Token,
-		"expires_in":         strconv.FormatInt(newAToken.ExpiresIn, 10),
+		"access_expires_in":  strconv.FormatInt(newAToken.ExpiresIn, 10),
 		"refresh_token":      newRToken.Token,
 		"refresh_expires_in": strconv.FormatInt(newRToken.ExpiresIn, 10),
 	}, nil

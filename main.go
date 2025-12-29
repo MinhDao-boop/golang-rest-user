@@ -1,6 +1,7 @@
 package main
 
 import (
+	"golang-rest-user/config"
 	"golang-rest-user/database"
 	"golang-rest-user/handler"
 	"golang-rest-user/models"
@@ -15,6 +16,7 @@ import (
 
 func main() {
 
+	config.InitRedis()
 	masterDB := database.ConnectMasterDB()
 	masterDB.AutoMigrate(&models.Tenant{})
 	if err := database.InitTenantDBs(masterDB); err != nil {

@@ -27,7 +27,7 @@ func getAuthService(c *gin.Context) service.AuthService {
 	}
 	db := dbAny.(*gorm.DB)
 	userRepo := repository.NewUserRepo(db)
-	refreshTokenRepo := repository.NewRefreshTokenRepo(db)
+	refreshTokenRepo := repository.NewRefreshTokenRedisRepo()
 	jwtConfig := security.LoadJWTConfig()
 	jwtManager := security.NewManager(jwtConfig)
 	authSvc := service.NewAuthService(userRepo, refreshTokenRepo, jwtManager)
