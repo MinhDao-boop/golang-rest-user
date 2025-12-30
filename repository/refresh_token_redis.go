@@ -3,17 +3,17 @@ package repository
 import (
 	"context"
 	"errors"
-	"strconv"
+	"fmt"
 	"time"
 
 	"golang-rest-user/config"
 )
 
 type RefreshTokenRedis interface {
-	Create(string, uint, string, time.Duration) error
-	FindValidByHash(string) error
-	Revoke(string) error
-	RevokeAllByUser(uint) error
+	Create(tokenHash string, userID uint, tenantCode string, ttl time.Duration) error
+	FindValidByHash(tokenHash string, tenantCode string, userID uint) error
+	Revoke(tokenHash string, tenantCode string, userID uint) error
+	RevokeAllByUser(tenantCode string, userID uint) error
 }
 
 type RefreshTokenRedisRepo struct{}
@@ -22,58 +22,94 @@ func NewRefreshTokenRedisRepo() RefreshTokenRedis {
 	return &RefreshTokenRedisRepo{}
 }
 
+/* -------------------- key helpers -------------------- */
+
+func refreshKey(tenant string, userID uint, tokenHash string) string {
+	return fmt.Sprintf(
+		"auth:{%s}:user:%d:refresh:%s",
+		tenant,
+		userID,
+		tokenHash,
+	)
+}
+
+func userRefreshSetKey(tenant string, userID uint) string {
+	return fmt.Sprintf(
+		"auth:{%s}:user:%d:refresh_tokens",
+		tenant,
+		userID,
+	)
+}
+
+/* -------------------- methods -------------------- */
+
 func (r *RefreshTokenRedisRepo) Create(tokenHash string, userID uint, tenantCode string, ttl time.Duration) error {
-	key := "refresh:" + tokenHash
-	userKey := "user_refresh:" + strconv.Itoa(int(userID))
 
 	ctx := context.Background()
+
+	refreshKey := refreshKey(tenantCode, userID, tokenHash)
+	userSetKey := userRefreshSetKey(tenantCode, userID)
+
 	pipe := config.RDB.TxPipeline()
-	pipe.HSet(ctx, key, map[string]interface{}{
+
+	pipe.HSet(ctx, refreshKey, map[string]interface{}{
 		"user_id":     userID,
 		"tenant_code": tenantCode,
 	})
-	pipe.Expire(ctx, key, ttl)
-	pipe.SAdd(ctx, userKey, tokenHash)
-	pipe.Expire(ctx, userKey, ttl)
+
+	pipe.Expire(ctx, refreshKey, ttl)
+	pipe.SAdd(ctx, userSetKey, tokenHash)
+	pipe.Expire(ctx, userSetKey, ttl)
 
 	_, err := pipe.Exec(ctx)
 	return err
 }
 
-func (r *RefreshTokenRedisRepo) FindValidByHash(tokenHash string) error {
-	key := "refresh:" + tokenHash
+func (r *RefreshTokenRedisRepo) FindValidByHash(tokenHash string, tenantCode string, userID uint) error {
 
 	ctx := context.Background()
+	key := refreshKey(tenantCode, userID, tokenHash)
+
 	exists, err := config.RDB.Exists(ctx, key).Result()
 	if err != nil {
 		return err
 	}
 	if exists == 0 {
-		return errors.New("refresh token revoked")
+		return errors.New("refresh token revoked or expired")
 	}
 	return nil
 }
 
-func (r *RefreshTokenRedisRepo) Revoke(tokenHash string) error {
+func (r *RefreshTokenRedisRepo) Revoke(tokenHash string, tenantCode string, userID uint) error {
+
 	ctx := context.Background()
-	return config.RDB.Del(ctx, "refresh:"+tokenHash).Err()
+
+	refreshKey := refreshKey(tenantCode, userID, tokenHash)
+	userSetKey := userRefreshSetKey(tenantCode, userID)
+
+	pipe := config.RDB.TxPipeline()
+	pipe.Del(ctx, refreshKey)
+	pipe.SRem(ctx, userSetKey, tokenHash)
+
+	_, err := pipe.Exec(ctx)
+	return err
 }
 
-func (r *RefreshTokenRedisRepo) RevokeAllByUser(userID uint) error {
-	userKey := "user_refresh:" + strconv.Itoa(int(userID))
+func (r *RefreshTokenRedisRepo) RevokeAllByUser(tenantCode string, userID uint) error {
 
 	ctx := context.Background()
-	tokens, err := config.RDB.SMembers(ctx, userKey).Result()
+	userSetKey := userRefreshSetKey(tenantCode, userID)
+
+	tokens, err := config.RDB.SMembers(ctx, userSetKey).Result()
 	if err != nil {
 		return err
 	}
 
 	pipe := config.RDB.TxPipeline()
-
-	for _, t := range tokens {
-		pipe.Del(ctx, "refresh:"+t)
+	for _, token := range tokens {
+		pipe.Del(ctx, refreshKey(tenantCode, userID, token))
 	}
-	pipe.Del(ctx, userKey)
+	pipe.Del(ctx, userSetKey)
 
 	_, err = pipe.Exec(ctx)
 	return err

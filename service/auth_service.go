@@ -111,12 +111,12 @@ func (s *authService) Refresh(db *gorm.DB, rToken string) (map[string]interface{
 		return nil, errors.New("invalid refresh token")
 	}
 
-	if err := s.refreshTokenRepo.FindValidByHash(hashToken(rToken)); err != nil {
+	if err := s.refreshTokenRepo.FindValidByHash(hashToken(rToken), claims.TenantCode, claims.UserID); err != nil {
 		return nil, errors.New("refresh token revoked")
 	}
 
 	//revoke old refresh token
-	if err = s.refreshTokenRepo.Revoke(hashToken(rToken)); err != nil {
+	if err = s.refreshTokenRepo.Revoke(hashToken(rToken), claims.TenantCode, claims.UserID); err != nil {
 		return nil, err
 	}
 
@@ -146,5 +146,5 @@ func (s *authService) Logout(rToken string) error {
 		return errors.New("invalid refresh token")
 	}
 
-	return s.refreshTokenRepo.RevokeAllByUser(claims.UserID)
+	return s.refreshTokenRepo.RevokeAllByUser(claims.TenantCode, claims.UserID)
 }
