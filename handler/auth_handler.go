@@ -34,13 +34,13 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
-	user, err := h.authSvc.Register(tenantDB, req)
+	userResponse, err := h.authSvc.Register(tenantDB, req)
 	if err != nil {
 		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
 		return
 	}
 
-	response.Success(c, user)
+	response.Success(c, userResponse)
 }
 
 // POST /auth/login

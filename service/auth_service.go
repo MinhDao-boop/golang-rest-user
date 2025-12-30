@@ -16,7 +16,7 @@ import (
 )
 
 type AuthService interface {
-	Register(db *gorm.DB, req dto.CreateUserRequest) (*models.User, error)
+	Register(db *gorm.DB, req dto.CreateUserRequest) (*dto.UserResponse, error)
 	Login(db *gorm.DB, tenantCode string, req dto.LoginRequest) (map[string]interface{}, error)
 	Refresh(*gorm.DB, string) (map[string]interface{}, error)
 	Logout(refreshToken string) error
@@ -35,7 +35,7 @@ func NewAuthService(refreshTokenRepo repository.RefreshTokenRedis,
 	}
 }
 
-func (s *authService) Register(db *gorm.DB, req dto.CreateUserRequest) (*models.User, error) {
+func (s *authService) Register(db *gorm.DB, req dto.CreateUserRequest) (*dto.UserResponse, error) {
 	userRepo := repository.NewUserRepo(db)
 	if _, err := userRepo.GetByUsername(req.Username); err == nil {
 		return nil, errors.New("username already exists")
@@ -57,7 +57,7 @@ func (s *authService) Register(db *gorm.DB, req dto.CreateUserRequest) (*models.
 		return nil, err
 	}
 
-	return user, nil
+	return ConvertToUserResponse(user), nil
 }
 
 func (s *authService) Login(db *gorm.DB, tenantCode string, req dto.LoginRequest) (map[string]interface{}, error) {
@@ -94,7 +94,7 @@ func (s *authService) Login(db *gorm.DB, tenantCode string, req dto.LoginRequest
 		"access_token":       aToken.Token,
 		"access_expires_in":  aToken.ExpiresIn,
 		"refresh_token":      rToken.Token,
-		"refresh_expires_in": aToken.ExpiresIn,
+		"refresh_expires_in": rToken.ExpiresIn,
 	}, nil
 }
 

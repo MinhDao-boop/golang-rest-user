@@ -12,18 +12,10 @@ type Config struct {
 
 func LoadConfig() Config {
 	return Config{
-		DBUser: getenv("DB_USER", "root"),
-		DBPass: getenv("DB_PASS", "1234"),
-		DBHost: getenv("DB_HOST", "127.0.0.1"),
-		DBPort: getenv("DB_PORT", "3307"),
-		DBName: getenv("DB_NAME", "digo"),
+		DBUser: os.Getenv("DB_USER"),
+		DBPass: os.Getenv("DB_PASS"),
+		DBHost: os.Getenv("DB_HOST"),
+		DBPort: os.Getenv("DB_PORT"),
+		DBName: os.Getenv("DB_NAME"),
 	}
-}
-
-func getenv(key, fallback string) string {
-	v := os.Getenv(key)
-	if v == "" {
-		return fallback
-	}
-	return v
 }

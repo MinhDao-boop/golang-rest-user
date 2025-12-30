@@ -29,7 +29,7 @@ func NewUserService() UserService {
 	return &userService{}
 }
 
-func convertToUserResponse(user *models.User) *dto.UserResponse {
+func ConvertToUserResponse(user *models.User) *dto.UserResponse {
 	return &dto.UserResponse{
 		ID:        user.ID,
 		Uuid:      user.Uuid,
@@ -71,7 +71,7 @@ func (s *userService) Create(db *gorm.DB, req dto.CreateUserRequest) (*dto.UserR
 	if err := userRepo.Create(user); err != nil {
 		return nil, err
 	}
-	return convertToUserResponse(user), nil
+	return ConvertToUserResponse(user), nil
 }
 
 func (s *userService) GetByUUID(db *gorm.DB, uuid string) (*dto.UserResponse, error) {
@@ -80,21 +80,19 @@ func (s *userService) GetByUUID(db *gorm.DB, uuid string) (*dto.UserResponse, er
 	if err != nil {
 		return nil, err
 	}
-	return convertToUserResponse(user), nil
+	return ConvertToUserResponse(user), nil
 }
 
 func (s *userService) List(db *gorm.DB, page, pageSize int, search string) ([]dto.UserResponse, int64, error) {
 	userRepo := repository.NewUserRepo(db)
-	if strings.TrimSpace(search) == "" {
-		return nil, 0, nil
-	}
+	search = strings.TrimSpace(search)
 	users, total, err := userRepo.GetList(page, pageSize, search)
 	if err != nil {
 		return nil, 0, err
 	}
 	var result []dto.UserResponse
 	for _, u := range users {
-		result = append(result, *convertToUserResponse(&u))
+		result = append(result, *ConvertToUserResponse(&u))
 	}
 	return result, total, nil
 }
@@ -113,7 +111,7 @@ func (s *userService) Update(db *gorm.DB, uuid string, req dto.UpdateUserRequest
 	if err := userRepo.Update(user); err != nil {
 		return nil, err
 	}
-	return convertToUserResponse(user), nil
+	return ConvertToUserResponse(user), nil
 }
 
 func (s *userService) DeleteMany(db *gorm.DB, uuids []string) (int64, error) {

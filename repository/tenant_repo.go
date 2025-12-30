@@ -49,7 +49,7 @@ func (r *tenantRepo) GetList(page, pageSize int, search string) (tenants []model
 	offset := (page - 1) * pageSize
 	query := r.db.Model(&models.Tenant{})
 
-	query = query.Where("tenant_name LIKE ?", "%"+search+"%")
+	query = query.Where("name LIKE ?", "%"+search+"%")
 
 	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, err

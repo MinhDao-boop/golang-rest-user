@@ -30,6 +30,7 @@ func (h *TenantHandler) ListTenant(c *gin.Context) {
 	tenantResponses, total, err := h.svc.List(page, pageSize, search)
 	if err != nil {
 		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusInternalServerError)
+		return
 	}
 
 	response.Success(c, gin.H{
