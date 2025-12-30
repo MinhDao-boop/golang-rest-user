@@ -3,6 +3,7 @@ package service
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"golang-rest-user/dto"
@@ -15,25 +16,36 @@ import (
 )
 
 type UserService interface {
-	Create(dto.CreateUserRequest) (*models.User, error)
-	GetByUUID(string) (*models.User, error)
-	List(page, pageSize int, search string) ([]models.User, int64, error)
-	Update(uuid string, req dto.UpdateUserRequest) (*models.User, error)
-	Delete(string) error
-	DeleteMany([]string) (int64, error)
+	Create(*gorm.DB, dto.CreateUserRequest) (*dto.UserResponse, error)
+	GetByUUID(*gorm.DB, string) (*dto.UserResponse, error)
+	List(db *gorm.DB, page, pageSize int, search string) ([]dto.UserResponse, int64, error)
+	Update(db *gorm.DB, uuid string, req dto.UpdateUserRequest) (*dto.UserResponse, error)
+	DeleteMany(*gorm.DB, []string) (int64, error)
 }
 
-type userService struct {
-	repo repository.UserRepo
+type userService struct{}
+
+func NewUserService() UserService {
+	return &userService{}
 }
 
-func NewUserService(r repository.UserRepo) UserService {
-	return &userService{repo: r}
+func convertToUserResponse(user *models.User) *dto.UserResponse {
+	return &dto.UserResponse{
+		ID:        user.ID,
+		Uuid:      user.Uuid,
+		Username:  user.Username,
+		FullName:  user.FullName,
+		Phone:     user.Phone,
+		Position:  user.Position,
+		CreatedAt: user.CreatedAt.Format(time.RFC3339),
+		UpdatedAt: user.UpdatedAt.Format(time.RFC3339),
+	}
 }
 
-func (s *userService) Create(req dto.CreateUserRequest) (*models.User, error) {
+func (s *userService) Create(db *gorm.DB, req dto.CreateUserRequest) (*dto.UserResponse, error) {
+	userRepo := repository.NewUserRepo(db)
 	// check username existing
-	if _, err := s.repo.GetByUsername(req.Username); err == nil {
+	if _, err := userRepo.GetByUsername(req.Username); err == nil {
 		return nil, fmt.Errorf("username already exists")
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 		// if other error (like DB err), still return it
@@ -56,26 +68,40 @@ func (s *userService) Create(req dto.CreateUserRequest) (*models.User, error) {
 		CreatedAt: time.Now(),
 	}
 
-	if err := s.repo.Create(user); err != nil {
+	if err := userRepo.Create(user); err != nil {
 		return nil, err
 	}
-	return user, nil
+	return convertToUserResponse(user), nil
 }
 
-func (s *userService) GetByUUID(uuid string) (*models.User, error) {
-	user, err := s.repo.GetByUUID(uuid)
+func (s *userService) GetByUUID(db *gorm.DB, uuid string) (*dto.UserResponse, error) {
+	userRepo := repository.NewUserRepo(db)
+	user, err := userRepo.GetByUUID(uuid)
 	if err != nil {
 		return nil, err
 	}
-	return user, nil
+	return convertToUserResponse(user), nil
 }
 
-func (s *userService) List(page, pageSize int, search string) ([]models.User, int64, error) {
-	return s.repo.GetList(page, pageSize, search)
+func (s *userService) List(db *gorm.DB, page, pageSize int, search string) ([]dto.UserResponse, int64, error) {
+	userRepo := repository.NewUserRepo(db)
+	if strings.TrimSpace(search) == "" {
+		return nil, 0, nil
+	}
+	users, total, err := userRepo.GetList(page, pageSize, search)
+	if err != nil {
+		return nil, 0, err
+	}
+	var result []dto.UserResponse
+	for _, u := range users {
+		result = append(result, *convertToUserResponse(&u))
+	}
+	return result, total, nil
 }
 
-func (s *userService) Update(uuid string, req dto.UpdateUserRequest) (*models.User, error) {
-	user, err := s.repo.GetByUUID(uuid)
+func (s *userService) Update(db *gorm.DB, uuid string, req dto.UpdateUserRequest) (*dto.UserResponse, error) {
+	userRepo := repository.NewUserRepo(db)
+	user, err := userRepo.GetByUUID(uuid)
 	if err != nil {
 		return nil, err
 	}
@@ -84,31 +110,24 @@ func (s *userService) Update(uuid string, req dto.UpdateUserRequest) (*models.Us
 	user.Position = req.Position
 	user.UpdatedAt = time.Now().UTC()
 
-	if err := s.repo.Update(user); err != nil {
+	if err := userRepo.Update(user); err != nil {
 		return nil, err
 	}
-	return user, nil
+	return convertToUserResponse(user), nil
 }
 
-func (s *userService) Delete(uuid string) error {
-	user, err := s.repo.GetByUUID(uuid)
-	if err != nil {
-		return err
-	}
-	return s.repo.DeleteByID(user.ID)
-}
-
-func (s *userService) DeleteMany(uuids []string) (int64, error) {
+func (s *userService) DeleteMany(db *gorm.DB, uuids []string) (int64, error) {
+	userRepo := repository.NewUserRepo(db)
 	ids := []uint{}
-	for _, uuid := range uuids {
-		if uuid == "" {
+	for _, uu := range uuids {
+		if uu == "" {
 			continue
 		}
-		user, err := s.repo.GetByUUID(uuid)
+		user, err := userRepo.GetByUUID(uu)
 		if err != nil {
 			return 0, err
 		}
 		ids = append(ids, user.ID)
 	}
-	return s.repo.DeleteByIDs(ids)
+	return userRepo.DeleteByIDs(ids)
 }

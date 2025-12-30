@@ -23,12 +23,12 @@ func InitTenantDBs(masterDB *gorm.DB) error {
 	for _, t := range tenants {
 		dbUser, err := security.Decrypt(t.DBUser)
 		if err != nil {
-			log.Printf("❌ tenant %s decrypt db user failed", t.Code)
+			log.Printf("tenant %s decrypt db user failed", t.Code)
 			continue
 		}
 		dbPass, err := security.Decrypt(t.DBPass)
 		if err != nil {
-			log.Printf("❌ tenant %s decrypt db pass failed", t.Code)
+			log.Printf("tenant %s decrypt db pass failed", t.Code)
 			continue
 		}
 		dsn := fmt.Sprintf(
@@ -42,12 +42,12 @@ func InitTenantDBs(masterDB *gorm.DB) error {
 
 		db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
 		if err != nil {
-			log.Printf("❌ tenant %s connect failed", t.Code)
+			log.Printf("tenant %s connect failed", t.Code)
 			continue
 		}
 
 		SetTenantDB(t.Code, db)
-		log.Printf("✅ tenant %s connected", t.Code)
+		log.Printf("tenant %s connected", t.Code)
 	}
 
 	return nil

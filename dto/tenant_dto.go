@@ -1,5 +1,7 @@
 package dto
 
+import "golang-rest-user/models"
+
 type CreateTenantRequest struct {
 	Code   string `json:"code" binding:"required"`
 	Name   string `json:"name" binding:"required"`
@@ -19,19 +21,13 @@ type UpdateTenantRequest struct {
 }
 
 type TenantResponse struct {
-	ID        uint   `json:"id"`
-	Code      string `json:"code"`
-	Name      string `json:"name"`
-	DBHost    string `json:"db_host"`
-	DBPort    string `json:"db_port"`
-	DBName    string `json:"db_name"`
-	CreatedAt string `json:"created_at"`
-	UpdatedAt string `json:"updated_at"`
-}
-
-type ListTenantResponse struct {
-	Data     []TenantResponse `json:"data"`
-	Page     int              `json:"page"`
-	PageSize int              `json:"page_size"`
-	Total    int64            `json:"total"`
+	ID        uint                `json:"id"`
+	Code      string              `json:"code"`
+	Name      string              `json:"name"`
+	DBHost    string              `json:"db_host"`
+	DBPort    string              `json:"db_port"`
+	DBName    string              `json:"db_name"`
+	Status    models.TenantStatus `json:"status"`
+	CreatedAt string              `json:"created_at"`
+	UpdatedAt string              `json:"updated_at"`
 }

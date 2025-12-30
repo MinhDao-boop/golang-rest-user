@@ -1,9 +1,6 @@
 package repository
 
 import (
-	"errors"
-	"strings"
-
 	"golang-rest-user/models"
 
 	"gorm.io/gorm"
@@ -43,9 +40,6 @@ func (r *tenantRepo) GetByID(id uint) (*models.Tenant, error) {
 func (r *tenantRepo) GetByTenantCode(tenantCode string) (*models.Tenant, error) {
 	var t models.Tenant
 	if err := r.db.Where("code = ?", tenantCode).First(&t).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, err
-		}
 		return nil, err
 	}
 	return &t, nil
@@ -54,9 +48,9 @@ func (r *tenantRepo) GetByTenantCode(tenantCode string) (*models.Tenant, error) 
 func (r *tenantRepo) GetList(page, pageSize int, search string) (tenants []models.Tenant, total int64, err error) {
 	offset := (page - 1) * pageSize
 	query := r.db.Model(&models.Tenant{})
-	if strings.TrimSpace(search) != "" {
-		query = query.Where("tenant_name LIKE ?", "%"+search+"%")
-	}
+
+	query = query.Where("tenant_name LIKE ?", "%"+search+"%")
+
 	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
@@ -83,7 +77,7 @@ func (r *tenantRepo) RecoverDeleted(id uint) error {
 func (r *tenantRepo) FindDeletedByCode(tenantCode string) (*models.Tenant, error) {
 	var tenant models.Tenant
 
-	err := r.db.Unscoped().Where("deleted_at IS NOT NULL").First(&tenant, tenantCode).Error
+	err := r.db.Unscoped().Where("code = ? AND deleted_at IS NOT NULL", tenantCode).First(&tenant).Error
 	if err != nil {
 		return nil, err
 	}

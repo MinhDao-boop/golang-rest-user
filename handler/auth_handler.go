@@ -1,43 +1,30 @@
 package handler
 
 import (
+	"golang-rest-user/utils"
 	//"log"
 	"net/http"
 
 	"golang-rest-user/dto"
-	"golang-rest-user/repository"
 	"golang-rest-user/response"
-	"golang-rest-user/security"
 	"golang-rest-user/service"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 )
 
-type AuthHandler struct{}
-
-func NewAuthHandler() *AuthHandler {
-	return &AuthHandler{}
+type AuthHandler struct {
+	authSvc service.AuthService
 }
 
-func getAuthService(c *gin.Context) service.AuthService {
-	dbAny, ok := c.Get("TENANT_DB")
-	if !ok {
-		return nil
-	}
-	db := dbAny.(*gorm.DB)
-	userRepo := repository.NewUserRepo(db)
-	refreshTokenRepo := repository.NewRefreshTokenRedisRepo()
-	jwtConfig := security.LoadJWTConfig()
-	jwtManager := security.NewManager(jwtConfig)
-	authSvc := service.NewAuthService(userRepo, refreshTokenRepo, jwtManager)
-	return authSvc
+func NewAuthHandler(authSvc service.AuthService) *AuthHandler {
+	return &AuthHandler{authSvc: authSvc}
 }
 
 // POST /auth/register
 func (h *AuthHandler) Register(c *gin.Context) {
-	authSvc := getAuthService(c)
-	if authSvc == nil {
+	tenantDB, err := utils.GetTenantDB(c)
+	if err != nil {
+		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
 		return
 	}
 	var req dto.CreateUserRequest
@@ -47,7 +34,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
-	user, err := authSvc.Register(req)
+	user, err := h.authSvc.Register(tenantDB, req)
 	if err != nil {
 		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
 		return
@@ -58,8 +45,9 @@ func (h *AuthHandler) Register(c *gin.Context) {
 
 // POST /auth/login
 func (h *AuthHandler) Login(c *gin.Context) {
-	authSvc := getAuthService(c)
-	if authSvc == nil {
+	tenantDB, err := utils.GetTenantDB(c)
+	if err != nil {
+		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
 		return
 	}
 	var req dto.LoginRequest
@@ -70,7 +58,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	tenantCode := c.GetHeader("X-Tenant-Code")
 
-	tokens, err := authSvc.Login(tenantCode, req)
+	tokens, err := h.authSvc.Login(tenantDB, tenantCode, req)
 	if err != nil {
 		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusUnauthorized)
 		return
@@ -81,8 +69,9 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 // POST /auth/refresh
 func (h *AuthHandler) Refresh(c *gin.Context) {
-	authSvc := getAuthService(c)
-	if authSvc == nil {
+	tenantDB, err := utils.GetTenantDB(c)
+	if err != nil {
+		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
 		return
 	}
 	var req dto.RefreshTokenRequest
@@ -91,7 +80,7 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 		return
 	}
 
-	tokens, err := authSvc.Refresh(req.RefreshToken)
+	tokens, err := h.authSvc.Refresh(tenantDB, req.RefreshToken)
 	if err != nil {
 		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusUnauthorized)
 		return
@@ -101,17 +90,13 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 
 // POST /auth/logout
 func (h *AuthHandler) Logout(c *gin.Context) {
-	authSvc := getAuthService(c)
-	if authSvc == nil {
-		return
-	}
 	var req dto.LogoutRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
 		return
 	}
 
-	if err := authSvc.Logout(req.RefreshToken); err != nil {
+	if err := h.authSvc.Logout(req.RefreshToken); err != nil {
 		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusUnauthorized)
 		return
 	}

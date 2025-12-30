@@ -16,12 +16,11 @@ import (
 )
 
 type TenantService interface {
-	Create(dto.CreateTenantRequest) (*models.Tenant, error)
-	GetByTenantCode(string) (*models.Tenant, error)
-	List(page, pageSize int, search string) ([]models.Tenant, int64, error)
-	Update(tenantCode string, req dto.UpdateTenantRequest) (*models.Tenant, error)
+	Create(dto.CreateTenantRequest) (*dto.TenantResponse, error)
+	GetByTenantCode(string) (*dto.TenantResponse, error)
+	List(page, pageSize int, search string) ([]dto.TenantResponse, int64, error)
+	Update(tenantCode string, req dto.UpdateTenantRequest) (*dto.TenantResponse, error)
 	Delete(string) error
-	RecoverDeleted(string) (*models.Tenant, error)
 }
 
 type tenantService struct {
@@ -32,7 +31,21 @@ func NewTenantService(r repository.TenantRepo) TenantService {
 	return &tenantService{repo: r}
 }
 
-func (s *tenantService) Create(req dto.CreateTenantRequest) (*models.Tenant, error) {
+func convertToTenantResponse(tenant *models.Tenant) *dto.TenantResponse {
+	return &dto.TenantResponse{
+		ID:        tenant.ID,
+		Code:      tenant.Code,
+		Name:      tenant.Name,
+		DBHost:    tenant.DBHost,
+		DBPort:    tenant.DBPort,
+		DBName:    tenant.DBName,
+		Status:    tenant.Status,
+		CreatedAt: tenant.CreatedAt.Format(time.RFC3339),
+		UpdatedAt: tenant.UpdatedAt.Format(time.RFC3339),
+	}
+}
+
+func (s *tenantService) Create(req dto.CreateTenantRequest) (*dto.TenantResponse, error) {
 	// check db name existing
 	if _, err := s.repo.GetByTenantCode(req.Code); err == nil {
 		return nil, errors.New("tenant code already exists")
@@ -93,27 +106,39 @@ func (s *tenantService) Create(req dto.CreateTenantRequest) (*models.Tenant, err
 		if dbCreated {
 			// cleanup tenant database if tenant record creation failed
 			database.RemoveTenantDB(tenant.Code)
-			database.DropTenantDatabase(tenant.DBName)
+			err := database.DropTenantDatabase(tenant.DBName)
+			if err != nil {
+				return nil, err
+			}
 		}
 		return nil, err
 	}
-	return tenant, nil
+	return convertToTenantResponse(tenant), nil
 }
 
-func (s *tenantService) GetByTenantCode(tenantCode string) (*models.Tenant, error) {
+func (s *tenantService) GetByTenantCode(tenantCode string) (*dto.TenantResponse, error) {
 	tenantCode = strings.TrimSpace(strings.ToLower(tenantCode))
 	tenant, err := s.repo.GetByTenantCode(tenantCode)
 	if err != nil {
 		return nil, err
 	}
-	return tenant, nil
+	return convertToTenantResponse(tenant), nil
 }
 
-func (s *tenantService) List(page, pageSize int, search string) ([]models.Tenant, int64, error) {
-	return s.repo.GetList(page, pageSize, search)
+func (s *tenantService) List(page, pageSize int, search string) ([]dto.TenantResponse, int64, error) {
+	search = strings.TrimSpace(search)
+	tenants, total, err := s.repo.GetList(page, pageSize, search)
+	if err != nil {
+		return nil, 0, err
+	}
+	var result []dto.TenantResponse
+	for _, t := range tenants {
+		result = append(result, *convertToTenantResponse(&t))
+	}
+	return result, total, nil
 }
 
-func (s *tenantService) Update(tenantCode string, req dto.UpdateTenantRequest) (*models.Tenant, error) {
+func (s *tenantService) Update(tenantCode string, req dto.UpdateTenantRequest) (*dto.TenantResponse, error) {
 	tenant, err := s.repo.GetByTenantCode(tenantCode)
 	if err != nil {
 		return nil, err
@@ -139,7 +164,7 @@ func (s *tenantService) Update(tenantCode string, req dto.UpdateTenantRequest) (
 		if err := s.repo.Update(tenant); err != nil {
 			return nil, err
 		}
-		return tenant, nil
+		return convertToTenantResponse(tenant), nil
 	}
 	//Encrypt db user
 	encryptedUser, err := security.Encrypt(req.DBUser)
@@ -189,7 +214,7 @@ func (s *tenantService) Update(tenantCode string, req dto.UpdateTenantRequest) (
 		return nil, err
 	}
 
-	return tenant, nil
+	return convertToTenantResponse(tenant), nil
 }
 
 func needReconnect(oldTenant *models.Tenant, req dto.UpdateTenantRequest) bool {
@@ -211,40 +236,4 @@ func (s *tenantService) Delete(tenantCode string) error {
 		return err
 	}
 	return s.repo.DeleteByID(tenant.ID)
-}
-
-func (s *tenantService) RecoverDeleted(tenantCode string) (*models.Tenant, error) {
-	tenant, err := s.repo.FindDeletedByCode(tenantCode)
-	if err != nil {
-		return nil, err
-	}
-
-	masterDB := database.ConnectMasterDB()
-	ok, err := database.CheckTenantDBExists(masterDB, tenant.DBName)
-	if err != nil {
-		return nil, err
-	}
-	if !ok {
-		// create tenant database
-		if err := database.CreateTenantDatabase(tenant.DBName); err != nil {
-			return nil, err
-		}
-		// connect to tenant database
-		tenantDB, err := database.ConnectTenantDB(*tenant)
-		if err != nil {
-			return nil, err
-		}
-		// migrate tenant database
-		if err := database.Migrate(tenantDB); err != nil {
-			return nil, err
-		}
-		// ping tenant database
-		if err := database.PingDB(tenantDB); err != nil {
-			return nil, err
-		}
-		// add tenant db to map
-		database.SetTenantDB(tenant.Code, tenantDB)
-	}
-	s.repo.RecoverDeleted(tenant.ID)
-	return tenant, nil
 }

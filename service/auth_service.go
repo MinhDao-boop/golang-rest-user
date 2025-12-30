@@ -4,10 +4,10 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
-	"strconv"
 	"time"
 
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 
 	"golang-rest-user/dto"
 	"golang-rest-user/models"
@@ -16,30 +16,28 @@ import (
 )
 
 type AuthService interface {
-	Register(req dto.CreateUserRequest) (*models.User, error)
-	Login(tenantCode string, req dto.LoginRequest) (map[string]string, error)
-	Refresh(refreshToken string) (map[string]string, error)
+	Register(db *gorm.DB, req dto.CreateUserRequest) (*models.User, error)
+	Login(db *gorm.DB, tenantCode string, req dto.LoginRequest) (map[string]interface{}, error)
+	Refresh(*gorm.DB, string) (map[string]interface{}, error)
 	Logout(refreshToken string) error
 }
 
 type authService struct {
-	userRepo         repository.UserRepo
 	refreshTokenRepo repository.RefreshTokenRedis
 	jwtManager       *security.Manager
 }
 
-func NewAuthService(userRepo repository.UserRepo, refreshTokenRepo repository.RefreshTokenRedis,
+func NewAuthService(refreshTokenRepo repository.RefreshTokenRedis,
 	jwtManager *security.Manager) AuthService {
 	return &authService{
-		userRepo:         userRepo,
 		refreshTokenRepo: refreshTokenRepo,
 		jwtManager:       jwtManager,
 	}
 }
 
-func (s *authService) Register(req dto.CreateUserRequest) (*models.User, error) {
-
-	if _, err := s.userRepo.GetByUsername(req.Username); err == nil {
+func (s *authService) Register(db *gorm.DB, req dto.CreateUserRequest) (*models.User, error) {
+	userRepo := repository.NewUserRepo(db)
+	if _, err := userRepo.GetByUsername(req.Username); err == nil {
 		return nil, errors.New("username already exists")
 	}
 
@@ -55,16 +53,16 @@ func (s *authService) Register(req dto.CreateUserRequest) (*models.User, error) 
 		FullName: req.FullName,
 	}
 
-	if err := s.userRepo.Create(user); err != nil {
+	if err := userRepo.Create(user); err != nil {
 		return nil, err
 	}
 
 	return user, nil
 }
 
-func (s *authService) Login(tenantCode string, req dto.LoginRequest) (map[string]string, error) {
-
-	user, err := s.userRepo.GetByUsername(req.Username)
+func (s *authService) Login(db *gorm.DB, tenantCode string, req dto.LoginRequest) (map[string]interface{}, error) {
+	userRepo := repository.NewUserRepo(db)
+	user, err := userRepo.GetByUsername(req.Username)
 	if err != nil {
 		return nil, errors.New("invalid credentials")
 	}
@@ -92,11 +90,11 @@ func (s *authService) Login(tenantCode string, req dto.LoginRequest) (map[string
 		return nil, err
 	}
 
-	return map[string]string{
+	return map[string]interface{}{
 		"access_token":       aToken.Token,
-		"access_expires_in":  strconv.FormatInt(aToken.ExpiresIn, 10),
+		"access_expires_in":  aToken.ExpiresIn,
 		"refresh_token":      rToken.Token,
-		"refresh_expires_in": strconv.FormatInt(rToken.ExpiresIn, 10),
+		"refresh_expires_in": aToken.ExpiresIn,
 	}, nil
 }
 
@@ -105,7 +103,8 @@ func hashToken(rToken string) string {
 	return hex.EncodeToString(h[:])
 }
 
-func (s *authService) Refresh(rToken string) (map[string]string, error) {
+func (s *authService) Refresh(db *gorm.DB, rToken string) (map[string]interface{}, error) {
+	userRepo := repository.NewUserRepo(db)
 	claims, err := s.jwtManager.ParseToken(rToken)
 
 	if err != nil || claims.Type != "refresh" {
@@ -121,7 +120,7 @@ func (s *authService) Refresh(rToken string) (map[string]string, error) {
 		return nil, err
 	}
 
-	user, _ := s.userRepo.GetByID(claims.UserID)
+	user, _ := userRepo.GetByID(claims.UserID)
 
 	newAToken, _ := s.jwtManager.GenerateAccessToken(claims.UserID, user.Username, claims.TenantCode)
 	newRToken, _ := s.jwtManager.GenerateRefreshToken(claims.UserID, claims.TenantCode)
@@ -133,11 +132,11 @@ func (s *authService) Refresh(rToken string) (map[string]string, error) {
 		return nil, err
 	}
 
-	return map[string]string{
+	return map[string]interface{}{
 		"access_token":       newAToken.Token,
-		"access_expires_in":  strconv.FormatInt(newAToken.ExpiresIn, 10),
+		"access_expires_in":  newAToken.ExpiresIn,
 		"refresh_token":      newRToken.Token,
-		"refresh_expires_in": strconv.FormatInt(newRToken.ExpiresIn, 10),
+		"refresh_expires_in": newRToken.ExpiresIn,
 	}, nil
 }
 

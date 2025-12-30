@@ -1,9 +1,6 @@
 package repository
 
 import (
-	"errors"
-	"strings"
-
 	"golang-rest-user/models"
 
 	"gorm.io/gorm"
@@ -14,7 +11,6 @@ type UserRepo interface {
 	GetByID(id uint) (*models.User, error)
 	GetList(page, pageSize int, search string) (users []models.User, total int64, err error)
 	Update(user *models.User) error
-	DeleteByID(id uint) error
 	DeleteByIDs(ids []uint) (deleted int64, err error)
 	GetByUsername(username string) (*models.User, error)
 	GetByUUID(string) (*models.User, error)
@@ -35,9 +31,6 @@ func (r *userRepo) Create(user *models.User) error {
 func (r *userRepo) GetByID(id uint) (*models.User, error) {
 	var u models.User
 	if err := r.db.First(&u, id).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, err
-		}
 		return nil, err
 	}
 	return &u, nil
@@ -54,9 +47,7 @@ func (r *userRepo) GetByUsername(username string) (*models.User, error) {
 func (r *userRepo) GetList(page, pageSize int, search string) (users []models.User, total int64, err error) {
 	offset := (page - 1) * pageSize
 	query := r.db.Model(&models.User{})
-	if strings.TrimSpace(search) != "" {
-		query = query.Where("username LIKE ?", "%"+search+"%")
-	}
+	query = query.Where("username LIKE ?", "%"+search+"%")
 	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
@@ -70,10 +61,6 @@ func (r *userRepo) Update(user *models.User) error {
 	return r.db.Save(user).Error
 }
 
-func (r *userRepo) DeleteByID(id uint) error {
-	return r.db.Delete(&models.User{}, id).Error
-}
-
 func (r *userRepo) DeleteByIDs(ids []uint) (int64, error) {
 	res := r.db.Delete(&models.User{}, ids)
 	return res.RowsAffected, res.Error
@@ -82,9 +69,6 @@ func (r *userRepo) DeleteByIDs(ids []uint) (int64, error) {
 func (r *userRepo) GetByUUID(uuid string) (*models.User, error) {
 	var u models.User
 	if err := r.db.Where("uuid = ?", uuid).First(&u).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, err
-		}
 		return nil, err
 	}
 	return &u, nil

@@ -31,17 +31,9 @@ type UserResponse struct {
 	ID        uint   `json:"id"`
 	Uuid      string `json:"uuid"`
 	Username  string `json:"username"`
-	Password  string `json:"password"`
 	FullName  string `json:"fullname"`
 	Phone     string `json:"phone"`
 	Position  string `json:"position"`
 	CreatedAt string `json:"created_at"`
 	UpdatedAt string `json:"updated_at"`
-}
-
-type ListUsersResponse struct {
-	Data     []UserResponse `json:"data"`
-	Page     int            `json:"page"`
-	PageSize int            `json:"page_size"`
-	Total    int64          `json:"total"`
 }

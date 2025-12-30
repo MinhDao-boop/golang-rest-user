@@ -5,6 +5,7 @@ import (
 	"golang-rest-user/database"
 	"golang-rest-user/handler"
 	"golang-rest-user/models"
+	"golang-rest-user/security"
 
 	"golang-rest-user/repository"
 	"golang-rest-user/routes"
@@ -18,7 +19,10 @@ func main() {
 
 	config.InitRedis()
 	masterDB := database.ConnectMasterDB()
-	masterDB.AutoMigrate(&models.Tenant{})
+	err := masterDB.AutoMigrate(&models.Tenant{})
+	if err != nil {
+		return
+	}
 	if err := database.InitTenantDBs(masterDB); err != nil {
 		log.Fatal(err)
 	}
@@ -28,9 +32,14 @@ func main() {
 	tntSvc := service.NewTenantService(tntRepo)
 	tntHandler := handler.NewTenantHandler(tntSvc)
 
-	userHandler := handler.NewUserHandler()
+	userService := service.NewUserService()
+	userHandler := handler.NewUserHandler(userService)
 
-	authHandler := handler.NewAuthHandler()
+	jwtConfig := security.LoadJWTConfig()
+	jwtManager := security.NewManager(jwtConfig)
+	refreshTokenRedis := repository.NewRefreshTokenRedisRepo()
+	authSvc := service.NewAuthService(refreshTokenRedis, jwtManager)
+	authHandler := handler.NewAuthHandler(authSvc)
 
 	routes.RegisterRoutes(r, userHandler, tntHandler, authHandler)
 
