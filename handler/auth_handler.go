@@ -1,8 +1,6 @@
 package handler
 
 import (
-	"golang-rest-user/utils"
-	//"log"
 	"net/http"
 
 	"golang-rest-user/dto"
@@ -22,11 +20,6 @@ func NewAuthHandler(authSvc service.AuthService) *AuthHandler {
 
 // POST /auth/register
 func (h *AuthHandler) Register(c *gin.Context) {
-	tenantDB, err := utils.GetTenantDB(c)
-	if err != nil {
-		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
-		return
-	}
 	var req dto.CreateUserRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -34,7 +27,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
-	userResponse, err := h.authSvc.Register(tenantDB, req)
+	userResponse, err := h.authSvc.Register(c.Request.Context(), req)
 	if err != nil {
 		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
 		return
@@ -45,11 +38,6 @@ func (h *AuthHandler) Register(c *gin.Context) {
 
 // POST /auth/login
 func (h *AuthHandler) Login(c *gin.Context) {
-	tenantDB, err := utils.GetTenantDB(c)
-	if err != nil {
-		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
-		return
-	}
 	var req dto.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
@@ -58,7 +46,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	tenantCode := c.GetHeader("X-Tenant-Code")
 
-	tokens, err := h.authSvc.Login(tenantDB, tenantCode, req)
+	tokens, err := h.authSvc.Login(c.Request.Context(), tenantCode, req)
 	if err != nil {
 		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusUnauthorized)
 		return
@@ -69,18 +57,13 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 // POST /auth/refresh
 func (h *AuthHandler) Refresh(c *gin.Context) {
-	tenantDB, err := utils.GetTenantDB(c)
-	if err != nil {
-		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
-		return
-	}
 	var req dto.RefreshTokenRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
 		return
 	}
 
-	tokens, err := h.authSvc.Refresh(tenantDB, req.RefreshToken)
+	tokens, err := h.authSvc.Refresh(c.Request.Context(), req.RefreshToken)
 	if err != nil {
 		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusUnauthorized)
 		return

@@ -85,19 +85,19 @@ func CheckConnectMasterDB(tenant models.Tenant) (bool, error) {
 	return true, nil
 }
 
-func CheckTenantDBExists(masterDB *gorm.DB, dbName string) (bool, error) {
-	var name string
-
-	if err := masterDB.Raw(`
-		SELECT SCHEMA_NAME
-		FROM INFORMATION_SCHEMA.SCHEMATA
-		WHERE SCHEMA_NAME = ?
-	`, dbName).Scan(&name).Error; err != nil {
-		return false, err
-	}
-
-	return name != "", nil
-}
+//func CheckTenantDBExists(masterDB *gorm.DB, dbName string) (bool, error) {
+//	var name string
+//
+//	if err := masterDB.Raw(`
+//		SELECT SCHEMA_NAME
+//		FROM INFORMATION_SCHEMA.SCHEMATA
+//		WHERE SCHEMA_NAME = ?
+//	`, dbName).Scan(&name).Error; err != nil {
+//		return false, err
+//	}
+//
+//	return name != "", nil
+//}
 
 func PingDB(db *gorm.DB) error {
 	sqlDB, err := db.DB()

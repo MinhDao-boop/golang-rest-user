@@ -1,52 +1,67 @@
 package repository
 
 import (
+	"context"
 	"golang-rest-user/models"
-
-	"gorm.io/gorm"
+	"golang-rest-user/utils"
 )
 
 type UserRepo interface {
-	Create(user *models.User) error
-	GetByID(id uint) (*models.User, error)
-	GetList(page, pageSize int, search string) (users []models.User, total int64, err error)
-	Update(user *models.User) error
-	DeleteByIDs(ids []uint) (deleted int64, err error)
-	GetByUsername(username string) (*models.User, error)
-	GetByUUID(string) (*models.User, error)
+	Create(context.Context, *models.User) error
+	GetByID(context.Context, uint) (*models.User, error)
+	GetList(ctx context.Context, page, pageSize int, search string) (users []models.User, total int64, err error)
+	Update(context.Context, *models.User) error
+	DeleteByIDs(context.Context, []uint) (deleted int64, err error)
+	GetByUsername(context.Context, string) (*models.User, error)
+	GetByUUID(context.Context, string) (*models.User, error)
 }
 
 type userRepo struct {
-	db *gorm.DB
 }
 
-func NewUserRepo(db *gorm.DB) UserRepo {
-	return &userRepo{db: db}
+func NewUserRepo() UserRepo {
+	return &userRepo{}
 }
 
-func (r *userRepo) Create(user *models.User) error {
-	return r.db.Create(user).Error
+func (r *userRepo) Create(ctx context.Context, user *models.User) error {
+	db, err := utils.GetTenantDBFromContext(ctx)
+	if err != nil {
+		return err
+	}
+	return db.Create(user).Error
 }
 
-func (r *userRepo) GetByID(id uint) (*models.User, error) {
+func (r *userRepo) GetByID(ctx context.Context, id uint) (*models.User, error) {
+	db, err := utils.GetTenantDBFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 	var u models.User
-	if err := r.db.First(&u, id).Error; err != nil {
+	if err := db.First(&u, id).Error; err != nil {
 		return nil, err
 	}
 	return &u, nil
 }
 
-func (r *userRepo) GetByUsername(username string) (*models.User, error) {
+func (r *userRepo) GetByUsername(ctx context.Context, username string) (*models.User, error) {
+	db, err := utils.GetTenantDBFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 	var u models.User
-	if err := r.db.Where("username = ?", username).First(&u).Error; err != nil {
+	if err := db.Where("username = ?", username).First(&u).Error; err != nil {
 		return nil, err
 	}
 	return &u, nil
 }
 
-func (r *userRepo) GetList(page, pageSize int, search string) (users []models.User, total int64, err error) {
+func (r *userRepo) GetList(ctx context.Context, page, pageSize int, search string) (users []models.User, total int64, err error) {
+	db, err := utils.GetTenantDBFromContext(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
 	offset := (page - 1) * pageSize
-	query := r.db.Model(&models.User{})
+	query := db.Model(&models.User{})
 	query = query.Where("username LIKE ?", "%"+search+"%")
 	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, err
@@ -57,18 +72,30 @@ func (r *userRepo) GetList(page, pageSize int, search string) (users []models.Us
 	return users, total, nil
 }
 
-func (r *userRepo) Update(user *models.User) error {
-	return r.db.Save(user).Error
+func (r *userRepo) Update(ctx context.Context, user *models.User) error {
+	db, err := utils.GetTenantDBFromContext(ctx)
+	if err != nil {
+		return err
+	}
+	return db.Save(user).Error
 }
 
-func (r *userRepo) DeleteByIDs(ids []uint) (int64, error) {
-	res := r.db.Delete(&models.User{}, ids)
+func (r *userRepo) DeleteByIDs(ctx context.Context, ids []uint) (int64, error) {
+	db, err := utils.GetTenantDBFromContext(ctx)
+	if err != nil {
+		return 0, err
+	}
+	res := db.Delete(&models.User{}, ids)
 	return res.RowsAffected, res.Error
 }
 
-func (r *userRepo) GetByUUID(uuid string) (*models.User, error) {
+func (r *userRepo) GetByUUID(ctx context.Context, uuid string) (*models.User, error) {
+	db, err := utils.GetTenantDBFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 	var u models.User
-	if err := r.db.Where("uuid = ?", uuid).First(&u).Error; err != nil {
+	if err := db.Where("uuid = ?", uuid).First(&u).Error; err != nil {
 		return nil, err
 	}
 	return &u, nil

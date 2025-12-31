@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	//"log"
 	"net/http"
 
@@ -24,7 +25,8 @@ func TenantDBMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		c.Set("TENANT_DB", db)
+		ctx := context.WithValue(c.Request.Context(), "TENANT_DB", db)
+		c.Request = c.Request.WithContext(ctx)
 		c.Next()
 	}
 }

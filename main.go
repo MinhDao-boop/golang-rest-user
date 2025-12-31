@@ -32,13 +32,14 @@ func main() {
 	tntSvc := service.NewTenantService(tntRepo)
 	tntHandler := handler.NewTenantHandler(tntSvc)
 
-	userService := service.NewUserService()
+	userRepo := repository.NewUserRepo()
+	userService := service.NewUserService(userRepo)
 	userHandler := handler.NewUserHandler(userService)
 
 	jwtConfig := security.LoadJWTConfig()
 	jwtManager := security.NewManager(jwtConfig)
 	refreshTokenRedis := repository.NewRefreshTokenRedisRepo()
-	authSvc := service.NewAuthService(refreshTokenRedis, jwtManager)
+	authSvc := service.NewAuthService(userRepo, refreshTokenRedis, jwtManager)
 	authHandler := handler.NewAuthHandler(authSvc)
 
 	routes.RegisterRoutes(r, userHandler, tntHandler, authHandler)

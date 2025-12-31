@@ -1,43 +1,44 @@
 package service
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"time"
 
-	"github.com/google/uuid"
-	"gorm.io/gorm"
-
 	"golang-rest-user/dto"
 	"golang-rest-user/models"
 	"golang-rest-user/repository"
 	"golang-rest-user/security"
+
+	"github.com/google/uuid"
 )
 
 type AuthService interface {
-	Register(db *gorm.DB, req dto.CreateUserRequest) (*dto.UserResponse, error)
-	Login(db *gorm.DB, tenantCode string, req dto.LoginRequest) (map[string]interface{}, error)
-	Refresh(*gorm.DB, string) (map[string]interface{}, error)
+	Register(ctx context.Context, req dto.CreateUserRequest) (*dto.UserResponse, error)
+	Login(ctx context.Context, tenantCode string, req dto.LoginRequest) (map[string]interface{}, error)
+	Refresh(context.Context, string) (map[string]interface{}, error)
 	Logout(refreshToken string) error
 }
 
 type authService struct {
+	userRepo         repository.UserRepo
 	refreshTokenRepo repository.RefreshTokenRedis
 	jwtManager       *security.Manager
 }
 
-func NewAuthService(refreshTokenRepo repository.RefreshTokenRedis,
+func NewAuthService(userRepo repository.UserRepo, refreshTokenRepo repository.RefreshTokenRedis,
 	jwtManager *security.Manager) AuthService {
 	return &authService{
+		userRepo:         userRepo,
 		refreshTokenRepo: refreshTokenRepo,
 		jwtManager:       jwtManager,
 	}
 }
 
-func (s *authService) Register(db *gorm.DB, req dto.CreateUserRequest) (*dto.UserResponse, error) {
-	userRepo := repository.NewUserRepo(db)
-	if _, err := userRepo.GetByUsername(req.Username); err == nil {
+func (s *authService) Register(ctx context.Context, req dto.CreateUserRequest) (*dto.UserResponse, error) {
+	if _, err := s.userRepo.GetByUsername(ctx, req.Username); err == nil {
 		return nil, errors.New("username already exists")
 	}
 
@@ -53,16 +54,15 @@ func (s *authService) Register(db *gorm.DB, req dto.CreateUserRequest) (*dto.Use
 		FullName: req.FullName,
 	}
 
-	if err := userRepo.Create(user); err != nil {
+	if err := s.userRepo.Create(ctx, user); err != nil {
 		return nil, err
 	}
 
 	return ConvertToUserResponse(user), nil
 }
 
-func (s *authService) Login(db *gorm.DB, tenantCode string, req dto.LoginRequest) (map[string]interface{}, error) {
-	userRepo := repository.NewUserRepo(db)
-	user, err := userRepo.GetByUsername(req.Username)
+func (s *authService) Login(ctx context.Context, tenantCode string, req dto.LoginRequest) (map[string]interface{}, error) {
+	user, err := s.userRepo.GetByUsername(ctx, req.Username)
 	if err != nil {
 		return nil, errors.New("invalid credentials")
 	}
@@ -103,8 +103,7 @@ func hashToken(rToken string) string {
 	return hex.EncodeToString(h[:])
 }
 
-func (s *authService) Refresh(db *gorm.DB, rToken string) (map[string]interface{}, error) {
-	userRepo := repository.NewUserRepo(db)
+func (s *authService) Refresh(ctx context.Context, rToken string) (map[string]interface{}, error) {
 	claims, err := s.jwtManager.ParseToken(rToken)
 
 	if err != nil || claims.Type != "refresh" {
@@ -120,7 +119,7 @@ func (s *authService) Refresh(db *gorm.DB, rToken string) (map[string]interface{
 		return nil, err
 	}
 
-	user, _ := userRepo.GetByID(claims.UserID)
+	user, _ := s.userRepo.GetByID(ctx, claims.UserID)
 
 	newAToken, _ := s.jwtManager.GenerateAccessToken(claims.UserID, user.Username, claims.TenantCode)
 	newRToken, _ := s.jwtManager.GenerateRefreshToken(claims.UserID, claims.TenantCode)

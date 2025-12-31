@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"errors"
 	"golang-rest-user/dto"
 	"golang-rest-user/response"
 	"golang-rest-user/service"
@@ -11,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 )
 
 type UserHandler struct {
@@ -24,14 +22,10 @@ func NewUserHandler(s service.UserService) *UserHandler {
 
 // GET /users?page=1&page_size=10&search=...
 func (h *UserHandler) ListUsers(c *gin.Context) {
-	tenantDB, err := utils.GetTenantDB(c)
-	if err != nil {
-		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
-	}
 	page, pageSize := utils.GetPageAndPageSize(c)
 	search := c.Query("search")
 
-	userResponses, total, err := h.svc.List(tenantDB, page, pageSize, search)
+	userResponses, total, err := h.svc.List(c.Request.Context(), page, pageSize, search)
 	if err != nil {
 		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusInternalServerError)
 		return
@@ -47,17 +41,13 @@ func (h *UserHandler) ListUsers(c *gin.Context) {
 
 // POST /users
 func (h *UserHandler) CreateUser(c *gin.Context) {
-	tenantDB, err := utils.GetTenantDB(c)
-	if err != nil {
-		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
-	}
 	var req dto.CreateUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
 		return
 	}
 
-	userResponse, err := h.svc.Create(tenantDB, req)
+	userResponse, err := h.svc.Create(c.Request.Context(), req)
 	if err != nil {
 		if strings.Contains(err.Error(), "exists") {
 			response.Error(c, response.CodeBadRequest, "username already exists", nil, http.StatusConflict)
@@ -74,12 +64,9 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 
 // GET /users/:uuid
 func (h *UserHandler) GetByUserUUID(c *gin.Context) {
-	tenantDB, err := utils.GetTenantDB(c)
-	if err != nil {
-		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
-	}
+
 	uuid := c.Param("uuid")
-	userResponse, err := h.svc.GetByUUID(tenantDB, uuid)
+	userResponse, err := h.svc.GetByUUID(c.Request.Context(), uuid)
 	if err != nil {
 		response.Error(c, response.CodeBadRequest, "user not found", nil, http.StatusBadRequest)
 		return
@@ -89,10 +76,6 @@ func (h *UserHandler) GetByUserUUID(c *gin.Context) {
 
 // PUT /users/:uuid
 func (h *UserHandler) UpdateUser(c *gin.Context) {
-	tenantDB, err := utils.GetTenantDB(c)
-	if err != nil {
-		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
-	}
 	uuid := c.Param("uuid")
 
 	var req dto.UpdateUserRequest
@@ -101,7 +84,7 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 		return
 	}
 
-	userResponse, err := h.svc.Update(tenantDB, uuid, req)
+	userResponse, err := h.svc.Update(c.Request.Context(), uuid, req)
 	if err != nil {
 		response.Error(c, response.CodeBadRequest, "user not found", nil, http.StatusNotFound)
 		return
@@ -111,10 +94,6 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 
 // DELETE /users?uuids=1b0f0fe4-8710-4518-b8bc-7f1e52b280e4,1c8edc4f-b1a0-4252-808b-682eb76551ad,...
 func (h *UserHandler) DeleteManyUsers(c *gin.Context) {
-	tenantDB, err := utils.GetTenantDB(c)
-	if err != nil {
-		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
-	}
 	uuidsParam := c.Query("uuids")
 	if uuidsParam == "" {
 		response.Error(c, response.CodeBadRequest, "ids query param required", nil, http.StatusBadRequest)
@@ -128,12 +107,9 @@ func (h *UserHandler) DeleteManyUsers(c *gin.Context) {
 		}
 		uuids = append(uuids, strings.TrimSpace(p))
 	}
-	deleted, err := h.svc.DeleteMany(tenantDB, uuids)
+	deleted, err := h.svc.DeleteMany(c.Request.Context(), uuids)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			response.Error(c, response.CodeBadRequest, err.Error(), gin.H{"deleted": deleted}, http.StatusBadRequest)
-		}
-		response.Error(c, response.CodeBadRequest, err.Error(), gin.H{"deleted": deleted}, http.StatusInternalServerError)
+		response.Error(c, response.CodeBadRequest, err.Error(), gin.H{"deleted": deleted}, http.StatusBadRequest)
 		return
 	}
 	response.Success(c, gin.H{"deleted": deleted})

@@ -1,16 +1,16 @@
 package utils
 
 import (
+	"context"
 	"errors"
 
-	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
-func GetTenantDB(c *gin.Context) (*gorm.DB, error) {
-	dbRaw, ok := c.Get("TENANT_DB")
-	if !ok {
-		return nil, errors.New("tenant code is required")
+func GetTenantDBFromContext(ctx context.Context) (*gorm.DB, error) {
+	db, ok := ctx.Value("TENANT_DB").(*gorm.DB)
+	if !ok || db == nil {
+		return nil, errors.New("tenant db connection not found in context")
 	}
-	return dbRaw.(*gorm.DB), nil
+	return db.WithContext(ctx), nil
 }
