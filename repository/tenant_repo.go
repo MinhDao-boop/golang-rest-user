@@ -10,6 +10,7 @@ type TenantRepo interface {
 	Create(tenant *models.Tenant) error
 	GetByID(id uint) (*models.Tenant, error)
 	GetList(page, pageSize int, search string) (tenants []models.Tenant, total int64, err error)
+	ListAll() ([]models.Tenant, error)
 	Update(tenant *models.Tenant) error
 	DeleteByID(id uint) error
 	GetByTenantCode(tenantCode string) (*models.Tenant, error)
@@ -58,6 +59,13 @@ func (r *tenantRepo) GetList(page, pageSize int, search string) (tenants []model
 		return nil, 0, err
 	}
 	return tenants, total, nil
+}
+
+func (r *tenantRepo) ListAll() (tenants []models.Tenant, err error) {
+	if err := r.db.Find(&tenants).Error; err != nil {
+		return nil, err
+	}
+	return tenants, nil
 }
 
 func (r *tenantRepo) Update(tenant *models.Tenant) error {

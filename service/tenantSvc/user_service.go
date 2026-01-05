@@ -1,7 +1,6 @@
-package service
+package tenantSvc
 
 import (
-	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -15,25 +14,26 @@ import (
 )
 
 type UserService interface {
-	Create(context.Context, dto.CreateUserRequest) (*dto.UserResponse, error)
-	GetByUUID(context.Context, string) (*dto.UserResponse, error)
-	List(db context.Context, page, pageSize int, search string) ([]dto.UserResponse, int64, error)
-	Update(db context.Context, uuid string, req dto.UpdateUserRequest) (*dto.UserResponse, error)
-	DeleteMany(context.Context, []string) (int64, error)
+	Create(dto.CreateUserRequest) (*dto.UserResponse, error)
+	GetByUUID(string) (*dto.UserResponse, error)
+	List(page, pageSize int, search string) ([]dto.UserResponse, int64, error)
+	Update(uuid string, req dto.UpdateUserRequest) (*dto.UserResponse, error)
+	DeleteMany([]string) (int64, error)
 }
 
 type userService struct {
-	repo repository.UserRepo
+	tenantCode string
+	repo       repository.UserRepo
 }
 
-func NewUserService(r repository.UserRepo) UserService {
-	return &userService{repo: r}
+func NewUserService(tenantCode string, r repository.UserRepo) UserService {
+	return &userService{repo: r, tenantCode: tenantCode}
 }
 
 func ConvertToUserResponse(user *models.User) *dto.UserResponse {
 	return &dto.UserResponse{
 		ID:        user.ID,
-		Uuid:      user.Uuid,
+		UUID:      user.UUID,
 		Username:  user.Username,
 		FullName:  user.FullName,
 		Phone:     user.Phone,
@@ -43,19 +43,19 @@ func ConvertToUserResponse(user *models.User) *dto.UserResponse {
 	}
 }
 
-func (s *userService) Create(ctx context.Context, req dto.CreateUserRequest) (*dto.UserResponse, error) {
+func (s *userService) Create(req dto.CreateUserRequest) (*dto.UserResponse, error) {
 	// check username existing
-	if _, err := s.repo.GetByUsername(ctx, req.Username); err == nil {
+	if _, err := s.repo.GetByUsername(req.Username); err == nil {
 		return nil, fmt.Errorf("username already exists")
 	}
 
-	passEncrypted, err := security.Encrypt(req.Password)
+	passEncrypted, err := security.AESGCMEncrypt(req.Password)
 	if err != nil {
 		return nil, err
 	}
 
 	user := &models.User{
-		Uuid:      uuid.NewString(),
+		UUID:      uuid.New().String(),
 		Username:  req.Username,
 		Password:  passEncrypted,
 		FullName:  req.FullName,
@@ -64,23 +64,23 @@ func (s *userService) Create(ctx context.Context, req dto.CreateUserRequest) (*d
 		CreatedAt: time.Now(),
 	}
 
-	if err := s.repo.Create(ctx, user); err != nil {
+	if err := s.repo.Create(user); err != nil {
 		return nil, err
 	}
 	return ConvertToUserResponse(user), nil
 }
 
-func (s *userService) GetByUUID(ctx context.Context, uuid string) (*dto.UserResponse, error) {
-	user, err := s.repo.GetByUUID(ctx, uuid)
+func (s *userService) GetByUUID(uuid string) (*dto.UserResponse, error) {
+	user, err := s.repo.GetByUUID(uuid)
 	if err != nil {
 		return nil, err
 	}
 	return ConvertToUserResponse(user), nil
 }
 
-func (s *userService) List(ctx context.Context, page, pageSize int, search string) ([]dto.UserResponse, int64, error) {
+func (s *userService) List(page, pageSize int, search string) ([]dto.UserResponse, int64, error) {
 	search = strings.TrimSpace(search)
-	users, total, err := s.repo.GetList(ctx, page, pageSize, search)
+	users, total, err := s.repo.GetList(page, pageSize, search)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -91,8 +91,8 @@ func (s *userService) List(ctx context.Context, page, pageSize int, search strin
 	return result, total, nil
 }
 
-func (s *userService) Update(ctx context.Context, uuid string, req dto.UpdateUserRequest) (*dto.UserResponse, error) {
-	user, err := s.repo.GetByUUID(ctx, uuid)
+func (s *userService) Update(uuid string, req dto.UpdateUserRequest) (*dto.UserResponse, error) {
+	user, err := s.repo.GetByUUID(uuid)
 	if err != nil {
 		return nil, err
 	}
@@ -101,23 +101,23 @@ func (s *userService) Update(ctx context.Context, uuid string, req dto.UpdateUse
 	user.Position = req.Position
 	user.UpdatedAt = time.Now().UTC()
 
-	if err := s.repo.Update(ctx, user); err != nil {
+	if err := s.repo.Update(user); err != nil {
 		return nil, err
 	}
 	return ConvertToUserResponse(user), nil
 }
 
-func (s *userService) DeleteMany(ctx context.Context, uuids []string) (int64, error) {
+func (s *userService) DeleteMany(uuids []string) (int64, error) {
 	ids := []uint{}
 	for _, uu := range uuids {
 		if uu == "" {
 			continue
 		}
-		user, err := s.repo.GetByUUID(ctx, uu)
+		user, err := s.repo.GetByUUID(uu)
 		if err != nil {
 			return 0, err
 		}
 		ids = append(ids, user.ID)
 	}
-	return s.repo.DeleteByIDs(ctx, ids)
+	return s.repo.DeleteByIDs(ids)
 }

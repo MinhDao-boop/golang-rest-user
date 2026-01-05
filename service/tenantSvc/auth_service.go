@@ -1,7 +1,6 @@
-package service
+package tenantSvc
 
 import (
-	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -16,9 +15,9 @@ import (
 )
 
 type AuthService interface {
-	Register(ctx context.Context, req dto.CreateUserRequest) (*dto.UserResponse, error)
-	Login(ctx context.Context, tenantCode string, req dto.LoginRequest) (map[string]interface{}, error)
-	Refresh(context.Context, string) (map[string]interface{}, error)
+	Register(req dto.CreateUserRequest) (*dto.UserResponse, error)
+	Login(tenantCode string, req dto.LoginRequest) (map[string]interface{}, error)
+	Refresh(string) (map[string]interface{}, error)
 	Logout(refreshToken string) error
 }
 
@@ -37,37 +36,37 @@ func NewAuthService(userRepo repository.UserRepo, refreshTokenRepo repository.Re
 	}
 }
 
-func (s *authService) Register(ctx context.Context, req dto.CreateUserRequest) (*dto.UserResponse, error) {
-	if _, err := s.userRepo.GetByUsername(ctx, req.Username); err == nil {
+func (s *authService) Register(req dto.CreateUserRequest) (*dto.UserResponse, error) {
+	if _, err := s.userRepo.GetByUsername(req.Username); err == nil {
 		return nil, errors.New("username already exists")
 	}
 
-	encryptedPass, err := security.Encrypt(req.Password)
+	encryptedPass, err := security.AESGCMEncrypt(req.Password)
 	if err != nil {
 		return nil, err
 	}
 
 	user := &models.User{
-		Uuid:     uuid.NewString(),
+		UUID:     uuid.NewString(),
 		Username: req.Username,
 		Password: encryptedPass,
 		FullName: req.FullName,
 	}
 
-	if err := s.userRepo.Create(ctx, user); err != nil {
+	if err := s.userRepo.Create(user); err != nil {
 		return nil, err
 	}
 
 	return ConvertToUserResponse(user), nil
 }
 
-func (s *authService) Login(ctx context.Context, tenantCode string, req dto.LoginRequest) (map[string]interface{}, error) {
-	user, err := s.userRepo.GetByUsername(ctx, req.Username)
+func (s *authService) Login(tenantCode string, req dto.LoginRequest) (map[string]interface{}, error) {
+	user, err := s.userRepo.GetByUsername(req.Username)
 	if err != nil {
 		return nil, errors.New("invalid credentials")
 	}
 
-	decryptedPass, _ := security.Decrypt(user.Password)
+	decryptedPass, _ := security.AESGCMDecrypt(user.Password)
 	if decryptedPass != req.Password {
 		return nil, errors.New("invalid credentials")
 	}
@@ -103,7 +102,7 @@ func hashToken(rToken string) string {
 	return hex.EncodeToString(h[:])
 }
 
-func (s *authService) Refresh(ctx context.Context, rToken string) (map[string]interface{}, error) {
+func (s *authService) Refresh(rToken string) (map[string]interface{}, error) {
 	claims, err := s.jwtManager.ParseToken(rToken)
 
 	if err != nil || claims.Type != "refresh" {
@@ -119,7 +118,7 @@ func (s *authService) Refresh(ctx context.Context, rToken string) (map[string]in
 		return nil, err
 	}
 
-	user, _ := s.userRepo.GetByID(ctx, claims.UserID)
+	user, _ := s.userRepo.GetByID(claims.UserID)
 
 	newAToken, _ := s.jwtManager.GenerateAccessToken(claims.UserID, user.Username, claims.TenantCode)
 	newRToken, _ := s.jwtManager.GenerateRefreshToken(claims.UserID, claims.TenantCode)

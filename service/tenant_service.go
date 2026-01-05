@@ -2,12 +2,11 @@ package service
 
 import (
 	"errors"
+	"golang-rest-user/models"
+	"golang-rest-user/provider/tenantProvider"
 	"strings"
 
-	//"fmt"
-	"golang-rest-user/database"
 	"golang-rest-user/dto"
-	"golang-rest-user/models"
 	"golang-rest-user/repository"
 	"golang-rest-user/security"
 	"time"
@@ -54,13 +53,13 @@ func (s *tenantService) Create(req dto.CreateTenantRequest) (*dto.TenantResponse
 		return nil, err
 		// continue if record not found
 	}
-	//Encrypt db user
-	encryptedUser, err := security.Encrypt(req.DBUser)
+	//AESGCMEncrypt db user
+	encryptedUser, err := security.AESGCMEncrypt(req.DBUser)
 	if err != nil {
 		return nil, err
 	}
-	//Encrypt db password
-	encryptedPass, err := security.Encrypt(req.DBPass)
+	//AESGCMEncrypt db password
+	encryptedPass, err := security.AESGCMEncrypt(req.DBPass)
 	if err != nil {
 		return nil, err
 	}
@@ -74,45 +73,11 @@ func (s *tenantService) Create(req dto.CreateTenantRequest) (*dto.TenantResponse
 		DBName:    req.DBName,
 		CreatedAt: time.Now().UTC(),
 	}
-	//check connect to master db
-	connected, err := database.CheckConnectMasterDB(*tenant)
-	if err != nil || !connected {
-		return nil, errors.New("cannot connect to master database with provided credentials")
-	}
-	// flag to indicate if tenant db is created
-	dbCreated := false
-	// create tenant database
-	if err := database.CreateTenantDatabase(tenant.DBName); err != nil {
-		return nil, err
-	}
-	// connect to tenant database
-	tenantDB, err := database.ConnectTenantDB(*tenant)
-	if err != nil {
-		return nil, err
-	}
-	// migrate tenant database
-	if err := database.Migrate(tenantDB); err != nil {
-		return nil, err
-	}
-	// ping tenant database
-	if err := database.PingDB(tenantDB); err != nil {
-		return nil, err
-	}
-	// add tenant db to map
-	database.SetTenantDB(tenant.Code, tenantDB)
-	dbCreated = true
-	// save tenant record
 	if err := s.repo.Create(tenant); err != nil {
-		if dbCreated {
-			// cleanup tenant database if tenant record creation failed
-			database.RemoveTenantDB(tenant.Code)
-			err := database.DropTenantDatabase(tenant.DBName)
-			if err != nil {
-				return nil, err
-			}
-		}
 		return nil, err
 	}
+	tenantProvider.AddInstance(tenant)
+
 	return convertToTenantResponse(tenant), nil
 }
 
@@ -143,13 +108,13 @@ func (s *tenantService) Update(tenantCode string, req dto.UpdateTenantRequest) (
 	if err != nil {
 		return nil, err
 	}
-	//Decrypt old db user
-	oldDBUser, err := security.Decrypt(tenant.DBUser)
+	//AESGCMDecrypt old db user
+	oldDBUser, err := security.AESGCMDecrypt(tenant.DBUser)
 	if err != nil {
 		return nil, err
 	}
-	//Decrypt old db password
-	oldDBPass, err := security.Decrypt(tenant.DBPass)
+	//AESGCMDecrypt old db password
+	oldDBPass, err := security.AESGCMDecrypt(tenant.DBPass)
 	if err != nil {
 		return nil, err
 	}
@@ -166,13 +131,13 @@ func (s *tenantService) Update(tenantCode string, req dto.UpdateTenantRequest) (
 		}
 		return convertToTenantResponse(tenant), nil
 	}
-	//Encrypt db user
-	encryptedUser, err := security.Encrypt(req.DBUser)
+	//AESGCMEncrypt db user
+	encryptedUser, err := security.AESGCMEncrypt(req.DBUser)
 	if err != nil {
 		return nil, err
 	}
-	//Encrypt db password
-	encryptedPass, err := security.Encrypt(req.DBPass)
+	//AESGCMEncrypt db password
+	encryptedPass, err := security.AESGCMEncrypt(req.DBPass)
 	if err != nil {
 		return nil, err
 	}
@@ -182,35 +147,10 @@ func (s *tenantService) Update(tenantCode string, req dto.UpdateTenantRequest) (
 	tenant.DBHost = req.DBHost
 	tenant.DBPort = req.DBPort
 	tenant.UpdatedAt = time.Now().UTC()
-	//check connect to master db
-	connected, err := database.CheckConnectMasterDB(*tenant)
-	if err != nil || !connected {
-		return nil, errors.New("cannot connect to master database with provided credentials")
-	}
-	// flag to indicate if new db connection is established
-	dbConnected := false
-	// connect to tenant database
-	newDB, err := database.ConnectTenantDB(*tenant)
-	if err != nil {
-		return nil, err
-	}
-	//ping new db connection
-	if err := database.PingDB(newDB); err != nil {
-		return nil, err
-	}
-	dbConnected = true
-	// save tenant record
+
+	tenantProvider.EditInstance(tenant)
 	if err := s.repo.Update(tenant); err != nil {
-		if dbConnected {
-			// cleanup new db connection if tenant record update failed
-			database.CloseTenantDB(newDB)
-		}
-		return nil, err
-	}
-	// swap tenant db in map
-	oldDB := database.SwapTenantDB(tenant.Code, newDB)
-	// close old db connection
-	if err := database.CloseTenantDB(oldDB); err != nil {
+		tenantProvider.DeleteInstance(tenant.Code)
 		return nil, err
 	}
 
@@ -229,11 +169,6 @@ func (s *tenantService) Delete(tenantCode string) error {
 	if err != nil {
 		return err
 	}
-	// remove tenant db from map
-	oldDB := database.RemoveTenantDB(tenant.Code)
-	// close old db connection
-	if err := database.CloseTenantDB(oldDB); err != nil {
-		return err
-	}
+	tenantProvider.DeleteInstance(tenantCode)
 	return s.repo.DeleteByID(tenant.ID)
 }

@@ -5,12 +5,12 @@ import (
 	"golang-rest-user/database"
 	"golang-rest-user/handler"
 	"golang-rest-user/models"
-	"golang-rest-user/security"
+	"golang-rest-user/provider/tenantProvider"
+	"golang-rest-user/service/tenantSvc"
 
 	"golang-rest-user/repository"
 	"golang-rest-user/routes"
 	"golang-rest-user/service"
-	"log"
 
 	"github.com/gin-gonic/gin"
 )
@@ -23,24 +23,17 @@ func main() {
 	if err != nil {
 		return
 	}
-	if err := database.InitTenantDBs(masterDB); err != nil {
-		log.Fatal(err)
-	}
 	r := gin.Default()
 
 	tntRepo := repository.NewTenantRepo(masterDB)
 	tntSvc := service.NewTenantService(tntRepo)
+	tntCntSvc := tenantSvc.NewTenantConnect(tntRepo)
 	tntHandler := handler.NewTenantHandler(tntSvc)
 
-	userRepo := repository.NewUserRepo()
-	userService := service.NewUserService(userRepo)
-	userHandler := handler.NewUserHandler(userService)
+	tenantProvider.Init(tntCntSvc)
 
-	jwtConfig := security.LoadJWTConfig()
-	jwtManager := security.NewManager(jwtConfig)
-	refreshTokenRedis := repository.NewRefreshTokenRedisRepo()
-	authSvc := service.NewAuthService(userRepo, refreshTokenRedis, jwtManager)
-	authHandler := handler.NewAuthHandler(authSvc)
+	userHandler := handler.NewUserHandler()
+	authHandler := handler.NewAuthHandler()
 
 	routes.RegisterRoutes(r, userHandler, tntHandler, authHandler)
 

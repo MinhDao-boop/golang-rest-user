@@ -29,7 +29,7 @@ type UpdateUserRequest struct {
 
 type UserResponse struct {
 	ID        uint   `json:"id"`
-	Uuid      string `json:"uuid"`
+	UUID      string `json:"uuid"`
 	Username  string `json:"username"`
 	FullName  string `json:"fullname"`
 	Phone     string `json:"phone"`

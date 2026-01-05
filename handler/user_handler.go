@@ -2,8 +2,8 @@ package handler
 
 import (
 	"golang-rest-user/dto"
+	"golang-rest-user/provider/tenantProvider"
 	"golang-rest-user/response"
-	"golang-rest-user/service"
 	"golang-rest-user/utils"
 	"net/http"
 	"strconv"
@@ -13,19 +13,24 @@ import (
 )
 
 type UserHandler struct {
-	svc service.UserService
 }
 
-func NewUserHandler(s service.UserService) *UserHandler {
-	return &UserHandler{svc: s}
+func NewUserHandler() *UserHandler {
+	return &UserHandler{}
 }
 
 // GET /users?page=1&page_size=10&search=...
 func (h *UserHandler) ListUsers(c *gin.Context) {
+	tenantCode := c.GetHeader("X-Tenant-Code")
+	if tenantCode == "" {
+		return
+	}
+	service := tenantProvider.GetTenantInfo(tenantCode)
+
 	page, pageSize := utils.GetPageAndPageSize(c)
 	search := c.Query("search")
 
-	userResponses, total, err := h.svc.List(c.Request.Context(), page, pageSize, search)
+	userResponses, total, err := service.UserService.List(page, pageSize, search)
 	if err != nil {
 		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusInternalServerError)
 		return
@@ -41,13 +46,19 @@ func (h *UserHandler) ListUsers(c *gin.Context) {
 
 // POST /users
 func (h *UserHandler) CreateUser(c *gin.Context) {
+	tenantCode := c.GetHeader("X-Tenant-Code")
+	if tenantCode == "" {
+		return
+	}
+	service := tenantProvider.GetTenantInfo(tenantCode)
+
 	var req dto.CreateUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
 		return
 	}
 
-	userResponse, err := h.svc.Create(c.Request.Context(), req)
+	userResponse, err := service.UserService.Create(req)
 	if err != nil {
 		if strings.Contains(err.Error(), "exists") {
 			response.Error(c, response.CodeBadRequest, "username already exists", nil, http.StatusConflict)
@@ -64,9 +75,14 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 
 // GET /users/:uuid
 func (h *UserHandler) GetByUserUUID(c *gin.Context) {
+	tenantCode := c.GetHeader("X-Tenant-Code")
+	if tenantCode == "" {
+		return
+	}
+	service := tenantProvider.GetTenantInfo(tenantCode)
 
 	uuid := c.Param("uuid")
-	userResponse, err := h.svc.GetByUUID(c.Request.Context(), uuid)
+	userResponse, err := service.UserService.GetByUUID(uuid)
 	if err != nil {
 		response.Error(c, response.CodeBadRequest, "user not found", nil, http.StatusBadRequest)
 		return
@@ -76,6 +92,11 @@ func (h *UserHandler) GetByUserUUID(c *gin.Context) {
 
 // PUT /users/:uuid
 func (h *UserHandler) UpdateUser(c *gin.Context) {
+	tenantCode := c.GetHeader("X-Tenant-Code")
+	if tenantCode == "" {
+		return
+	}
+	service := tenantProvider.GetTenantInfo(tenantCode)
 	uuid := c.Param("uuid")
 
 	var req dto.UpdateUserRequest
@@ -84,7 +105,7 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 		return
 	}
 
-	userResponse, err := h.svc.Update(c.Request.Context(), uuid, req)
+	userResponse, err := service.UserService.Update(uuid, req)
 	if err != nil {
 		response.Error(c, response.CodeBadRequest, "user not found", nil, http.StatusNotFound)
 		return
@@ -94,6 +115,11 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 
 // DELETE /users?uuids=1b0f0fe4-8710-4518-b8bc-7f1e52b280e4,1c8edc4f-b1a0-4252-808b-682eb76551ad,...
 func (h *UserHandler) DeleteManyUsers(c *gin.Context) {
+	tenantCode := c.GetHeader("X-Tenant-Code")
+	if tenantCode == "" {
+		return
+	}
+	service := tenantProvider.GetTenantInfo(tenantCode)
 	uuidsParam := c.Query("uuids")
 	if uuidsParam == "" {
 		response.Error(c, response.CodeBadRequest, "ids query param required", nil, http.StatusBadRequest)
@@ -107,7 +133,7 @@ func (h *UserHandler) DeleteManyUsers(c *gin.Context) {
 		}
 		uuids = append(uuids, strings.TrimSpace(p))
 	}
-	deleted, err := h.svc.DeleteMany(c.Request.Context(), uuids)
+	deleted, err := service.UserService.DeleteMany(uuids)
 	if err != nil {
 		response.Error(c, response.CodeBadRequest, err.Error(), gin.H{"deleted": deleted}, http.StatusBadRequest)
 		return

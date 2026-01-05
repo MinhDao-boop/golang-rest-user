@@ -1,6 +1,8 @@
 package dto
 
-import "golang-rest-user/models"
+import (
+	"golang-rest-user/enums"
+)
 
 type CreateTenantRequest struct {
 	Code   string `json:"code" binding:"required"`
@@ -21,13 +23,13 @@ type UpdateTenantRequest struct {
 }
 
 type TenantResponse struct {
-	ID        uint                `json:"id"`
-	Code      string              `json:"code"`
-	Name      string              `json:"name"`
-	DBHost    string              `json:"db_host"`
-	DBPort    string              `json:"db_port"`
-	DBName    string              `json:"db_name"`
-	Status    models.TenantStatus `json:"status"`
-	CreatedAt string              `json:"created_at"`
-	UpdatedAt string              `json:"updated_at"`
+	ID        uint               `json:"id"`
+	Code      string             `json:"code"`
+	Name      string             `json:"name"`
+	DBHost    string             `json:"db_host"`
+	DBPort    string             `json:"db_port"`
+	DBName    string             `json:"db_name"`
+	Status    enums.TenantStatus `json:"status"`
+	CreatedAt string             `json:"created_at"`
+	UpdatedAt string             `json:"updated_at"`
 }

@@ -29,8 +29,8 @@ func getKey() ([]byte, error) {
 	return []byte(key), nil
 }
 
-// Encrypt encrypts plain text using AES-256-GCM
-func Encrypt(plainText string) (string, error) {
+// AESGCMEncrypt encrypts plain text using AES-256-GCM
+func AESGCMEncrypt(plainText string) (string, error) {
 	key, err := getKey()
 	if err != nil {
 		return "", err
@@ -55,8 +55,8 @@ func Encrypt(plainText string) (string, error) {
 	return base64.StdEncoding.EncodeToString(cipherText), nil
 }
 
-// Decrypt decrypts AES-256-GCM encrypted text
-func Decrypt(cipherText string) (string, error) {
+// AESGCMDecrypt decrypts AES-256-GCM encrypted text
+func AESGCMDecrypt(cipherText string) (string, error) {
 	key, err := getKey()
 	if err != nil {
 		return "", err
