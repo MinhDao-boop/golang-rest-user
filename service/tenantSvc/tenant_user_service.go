@@ -2,13 +2,13 @@ package tenantSvc
 
 import (
 	"fmt"
+	"golang-rest-user/utils"
 	"strings"
 	"time"
 
 	"golang-rest-user/dto"
 	"golang-rest-user/models"
 	"golang-rest-user/repository"
-	"golang-rest-user/security"
 
 	"github.com/google/uuid"
 )
@@ -49,7 +49,7 @@ func (s *userService) Create(req dto.CreateUserRequest) (*dto.UserResponse, erro
 		return nil, fmt.Errorf("username already exists")
 	}
 
-	passEncrypted, err := security.AESGCMEncrypt(req.Password)
+	passEncrypted, err := utils.AESGCMEncrypt(req.Password)
 	if err != nil {
 		return nil, err
 	}

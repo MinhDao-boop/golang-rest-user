@@ -1,4 +1,4 @@
-package handler
+package tenant
 
 import (
 	"golang-rest-user/dto"
@@ -12,16 +12,9 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type UserHandler struct {
-}
-
-func NewUserHandler() *UserHandler {
-	return &UserHandler{}
-}
-
 // GET /users?page=1&page_size=10&search=...
-func (h *UserHandler) ListUsers(c *gin.Context) {
-	tenantCode := c.GetHeader("X-Tenant-Code")
+func ListUsers(c *gin.Context) {
+	tenantCode := c.GetString("tenant_code")
 	if tenantCode == "" {
 		return
 	}
@@ -45,8 +38,8 @@ func (h *UserHandler) ListUsers(c *gin.Context) {
 }
 
 // POST /users
-func (h *UserHandler) CreateUser(c *gin.Context) {
-	tenantCode := c.GetHeader("X-Tenant-Code")
+func CreateUser(c *gin.Context) {
+	tenantCode := c.GetString("tenant_code")
 	if tenantCode == "" {
 		return
 	}
@@ -74,8 +67,8 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 }
 
 // GET /users/:uuid
-func (h *UserHandler) GetByUserUUID(c *gin.Context) {
-	tenantCode := c.GetHeader("X-Tenant-Code")
+func GetByUserUUID(c *gin.Context) {
+	tenantCode := c.GetString("tenant_code")
 	if tenantCode == "" {
 		return
 	}
@@ -91,8 +84,8 @@ func (h *UserHandler) GetByUserUUID(c *gin.Context) {
 }
 
 // PUT /users/:uuid
-func (h *UserHandler) UpdateUser(c *gin.Context) {
-	tenantCode := c.GetHeader("X-Tenant-Code")
+func UpdateUser(c *gin.Context) {
+	tenantCode := c.GetString("tenant_code")
 	if tenantCode == "" {
 		return
 	}
@@ -114,8 +107,8 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 }
 
 // DELETE /users?uuids=1b0f0fe4-8710-4518-b8bc-7f1e52b280e4,1c8edc4f-b1a0-4252-808b-682eb76551ad,...
-func (h *UserHandler) DeleteManyUsers(c *gin.Context) {
-	tenantCode := c.GetHeader("X-Tenant-Code")
+func DeleteManyUsers(c *gin.Context) {
+	tenantCode := c.GetString("tenant_code")
 	if tenantCode == "" {
 		return
 	}

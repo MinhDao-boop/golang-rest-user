@@ -6,6 +6,7 @@ import (
 	"golang-rest-user/repository"
 	"golang-rest-user/security"
 	"golang-rest-user/service/tenantSvc"
+	"golang-rest-user/utils"
 	"log"
 	"time"
 
@@ -20,8 +21,8 @@ type TenantInfo struct {
 }
 
 func (t *TenantInfo) Init() error {
-	t.Info.DBUser, _ = security.AESGCMDecrypt(t.Info.DBUser)
-	t.Info.DBPass, _ = security.AESGCMDecrypt(t.Info.DBPass)
+	t.Info.DBUser, _ = utils.AESGCMDecrypt(t.Info.DBUser)
+	t.Info.DBPass, _ = utils.AESGCMDecrypt(t.Info.DBPass)
 
 	err := database.CreateTenantDB(t.Info.DBUser, t.Info.DBPass, t.Info.DBHost, t.Info.DBPort, t.Info.DBName)
 	if err != nil {

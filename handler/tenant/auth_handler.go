@@ -1,4 +1,4 @@
-package handler
+package tenant
 
 import (
 	"golang-rest-user/provider/tenantProvider"
@@ -10,15 +10,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type AuthHandler struct {
-}
-
-func NewAuthHandler() *AuthHandler {
-	return &AuthHandler{}
-}
-
 // POST /auth/register
-func (h *AuthHandler) Register(c *gin.Context) {
+func Register(c *gin.Context) {
 	tenantCode := c.GetHeader("X-Tenant-Code")
 	if tenantCode == "" {
 		return
@@ -41,7 +34,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 }
 
 // POST /auth/login
-func (h *AuthHandler) Login(c *gin.Context) {
+func Login(c *gin.Context) {
 	tenantCode := c.GetHeader("X-Tenant-Code")
 	if tenantCode == "" {
 		return
@@ -63,7 +56,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 }
 
 // POST /auth/refresh
-func (h *AuthHandler) Refresh(c *gin.Context) {
+func Refresh(c *gin.Context) {
 	tenantCode := c.GetHeader("X-Tenant-Code")
 	if tenantCode == "" {
 		return
@@ -84,7 +77,7 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 }
 
 // POST /auth/logout
-func (h *AuthHandler) Logout(c *gin.Context) {
+func Logout(c *gin.Context) {
 	tenantCode := c.GetHeader("X-Tenant-Code")
 	if tenantCode == "" {
 		return

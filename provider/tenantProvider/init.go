@@ -7,7 +7,7 @@ import (
 
 var instance map[string]*TenantInfo
 
-func Init(tenantConnectSvc tenantSvc.TenantConnectInterface) {
+func Init(tenantConnectSvc tenantSvc.TenantConnect) {
 	instance = make(map[string]*TenantInfo)
 
 	data, err := tenantConnectSvc.ListAllTenantConnect()

@@ -5,7 +5,7 @@ import (
 	"golang-rest-user/repository"
 )
 
-type TenantConnectInterface interface {
+type TenantConnect interface {
 	ListAllTenantConnect() ([]models.Tenant, error)
 }
 
@@ -13,7 +13,7 @@ type tenantConnectImpl struct {
 	repo repository.TenantRepo
 }
 
-func NewTenantConnect(repo repository.TenantRepo) TenantConnectInterface {
+func NewTenantConnect(repo repository.TenantRepo) TenantConnect {
 	return &tenantConnectImpl{repo: repo}
 }
 

@@ -4,11 +4,11 @@ import (
 	"errors"
 	"golang-rest-user/models"
 	"golang-rest-user/provider/tenantProvider"
+	"golang-rest-user/utils"
 	"strings"
 
 	"golang-rest-user/dto"
 	"golang-rest-user/repository"
-	"golang-rest-user/security"
 	"time"
 
 	"gorm.io/gorm"
@@ -54,12 +54,12 @@ func (s *tenantService) Create(req dto.CreateTenantRequest) (*dto.TenantResponse
 		// continue if record not found
 	}
 	//AESGCMEncrypt db user
-	encryptedUser, err := security.AESGCMEncrypt(req.DBUser)
+	encryptedUser, err := utils.AESGCMEncrypt(req.DBUser)
 	if err != nil {
 		return nil, err
 	}
 	//AESGCMEncrypt db password
-	encryptedPass, err := security.AESGCMEncrypt(req.DBPass)
+	encryptedPass, err := utils.AESGCMEncrypt(req.DBPass)
 	if err != nil {
 		return nil, err
 	}
@@ -109,12 +109,12 @@ func (s *tenantService) Update(tenantCode string, req dto.UpdateTenantRequest) (
 		return nil, err
 	}
 	//AESGCMDecrypt old db user
-	oldDBUser, err := security.AESGCMDecrypt(tenant.DBUser)
+	oldDBUser, err := utils.AESGCMDecrypt(tenant.DBUser)
 	if err != nil {
 		return nil, err
 	}
 	//AESGCMDecrypt old db password
-	oldDBPass, err := security.AESGCMDecrypt(tenant.DBPass)
+	oldDBPass, err := utils.AESGCMDecrypt(tenant.DBPass)
 	if err != nil {
 		return nil, err
 	}
@@ -132,12 +132,12 @@ func (s *tenantService) Update(tenantCode string, req dto.UpdateTenantRequest) (
 		return convertToTenantResponse(tenant), nil
 	}
 	//AESGCMEncrypt db user
-	encryptedUser, err := security.AESGCMEncrypt(req.DBUser)
+	encryptedUser, err := utils.AESGCMEncrypt(req.DBUser)
 	if err != nil {
 		return nil, err
 	}
 	//AESGCMEncrypt db password
-	encryptedPass, err := security.AESGCMEncrypt(req.DBPass)
+	encryptedPass, err := utils.AESGCMEncrypt(req.DBPass)
 	if err != nil {
 		return nil, err
 	}

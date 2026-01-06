@@ -2,15 +2,10 @@ package main
 
 import (
 	"golang-rest-user/config"
-	"golang-rest-user/database"
-	"golang-rest-user/handler"
-	"golang-rest-user/models"
+	"golang-rest-user/provider/mySqlProvider"
+	"golang-rest-user/provider/routesProvider"
+	"golang-rest-user/provider/serviceProvider"
 	"golang-rest-user/provider/tenantProvider"
-	"golang-rest-user/service/tenantSvc"
-
-	"golang-rest-user/repository"
-	"golang-rest-user/routes"
-	"golang-rest-user/service"
 
 	"github.com/gin-gonic/gin"
 )
@@ -18,25 +13,20 @@ import (
 func main() {
 
 	config.InitRedis()
-	masterDB := database.ConnectMasterDB()
-	err := masterDB.AutoMigrate(&models.Tenant{})
-	if err != nil {
-		return
-	}
+	mySqlProvider.Init()
 	r := gin.Default()
 
-	tntRepo := repository.NewTenantRepo(masterDB)
-	tntSvc := service.NewTenantService(tntRepo)
-	tntCntSvc := tenantSvc.NewTenantConnect(tntRepo)
-	tntHandler := handler.NewTenantHandler(tntSvc)
+	serviceProvider.Init()
+
+	tntCntSvc := serviceProvider.GetInstance().TenantConnectService
 
 	tenantProvider.Init(tntCntSvc)
 
-	userHandler := handler.NewUserHandler()
-	authHandler := handler.NewAuthHandler()
+	routesProvider.Init(r)
 
-	routes.RegisterRoutes(r, userHandler, tntHandler, authHandler)
-
-	r.Run(":8080")
+	err := r.Run(":8080")
+	if err != nil {
+		return
+	}
 
 }

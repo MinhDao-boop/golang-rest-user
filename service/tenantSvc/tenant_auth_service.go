@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"golang-rest-user/utils"
 	"time"
 
 	"golang-rest-user/dto"
@@ -41,7 +42,7 @@ func (s *authService) Register(req dto.CreateUserRequest) (*dto.UserResponse, er
 		return nil, errors.New("username already exists")
 	}
 
-	encryptedPass, err := security.AESGCMEncrypt(req.Password)
+	encryptedPass, err := utils.AESGCMEncrypt(req.Password)
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +67,7 @@ func (s *authService) Login(tenantCode string, req dto.LoginRequest) (map[string
 		return nil, errors.New("invalid credentials")
 	}
 
-	decryptedPass, _ := security.AESGCMDecrypt(user.Password)
+	decryptedPass, _ := utils.AESGCMDecrypt(user.Password)
 	if decryptedPass != req.Password {
 		return nil, errors.New("invalid credentials")
 	}
@@ -105,6 +106,10 @@ func hashToken(rToken string) string {
 func (s *authService) Refresh(rToken string) (map[string]interface{}, error) {
 	claims, err := s.jwtManager.ParseToken(rToken)
 
+	if claims == nil {
+		return nil, errors.New("invalid token")
+	}
+
 	if err != nil || claims.Type != "refresh" {
 		return nil, errors.New("invalid refresh token")
 	}
@@ -140,6 +145,9 @@ func (s *authService) Refresh(rToken string) (map[string]interface{}, error) {
 
 func (s *authService) Logout(rToken string) error {
 	claims, err := s.jwtManager.ParseToken(rToken)
+	if claims == nil {
+		return errors.New("invalid token")
+	}
 	if err != nil || claims.Type != "refresh" {
 		return errors.New("invalid refresh token")
 	}
