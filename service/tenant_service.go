@@ -2,10 +2,9 @@ package service
 
 import (
 	"errors"
+	"golang-rest-user/enums"
 	"golang-rest-user/models"
-	"golang-rest-user/provider/tenantProvider"
 	"golang-rest-user/utils"
-	"os"
 	"regexp"
 	"strings"
 
@@ -14,22 +13,23 @@ import (
 	"time"
 )
 
+type CallBackFunction func(mode enums.HandleTenant, tenantCode string, tenant *models.Tenant)
+
 var dbnameRegex = regexp.MustCompile("^[a-z0-9_]{1,64}$")
-var dbHostRegex = os.Getenv("DB_HOST")
-var dbPortRegex = os.Getenv("DB_PORT")
-var dbUserRegex = os.Getenv("DB_USER")
-var dbPassRegex = os.Getenv("DB_PASS")
 
 type TenantService interface {
 	Create(dto.CreateTenantRequest) (*dto.TenantResponse, error)
 	GetByTenantCode(string) (*dto.TenantResponse, error)
 	List(page, pageSize int, search string) ([]dto.TenantResponse, int64, error)
+	ListAllTenantConnect() ([]models.Tenant, error)
 	Update(tenantCode string, req dto.UpdateTenantRequest) (*dto.TenantResponse, error)
 	Delete(string) error
+	SetCallBackFunction(CallBackFunction)
 }
 
 type tenantService struct {
-	repo repository.TenantRepo
+	callBackFunction CallBackFunction
+	repo             repository.TenantRepo
 }
 
 func NewTenantService(r repository.TenantRepo) TenantService {
@@ -67,14 +67,6 @@ func (s *tenantService) Create(req dto.CreateTenantRequest) (*dto.TenantResponse
 	if !isValidDBName(req.DBName) {
 		return nil, errors.New("invalid db name")
 	}
-	//Validate host and port
-	if req.DBHost != dbHostRegex || req.DBPort != dbPortRegex {
-		return nil, errors.New("invalid db host or port")
-	}
-	//Validate user and password
-	if req.DBUser != dbUserRegex || req.DBPass != dbPassRegex {
-		return nil, errors.New("invalid db user or password")
-	}
 	//AESGCMEncrypt db user
 	encryptedUser, err := utils.AESGCMEncrypt(req.DBUser)
 	if err != nil {
@@ -95,9 +87,15 @@ func (s *tenantService) Create(req dto.CreateTenantRequest) (*dto.TenantResponse
 		DBName:    req.DBName,
 		CreatedAt: time.Now().UTC(),
 	}
-	tenantProvider.AddInstance(tenant)
+	if s.callBackFunction != nil {
+		go func() {
+			s.callBackFunction(enums.AddTenantConnect, tenant.Code, tenant)
+		}()
+	}
 	if err := s.repo.Create(tenant); err != nil {
-		tenantProvider.DeleteInstance(tenant.Code)
+		go func() {
+			s.callBackFunction(enums.DeleteTenantConnect, tenant.Code, tenant)
+		}()
 		return nil, err
 	}
 	return convertToTenantResponse(tenant), nil
@@ -123,6 +121,14 @@ func (s *tenantService) List(page, pageSize int, search string) ([]dto.TenantRes
 		result = append(result, *convertToTenantResponse(&t))
 	}
 	return result, total, nil
+}
+
+func (s *tenantService) ListAllTenantConnect() ([]models.Tenant, error) {
+	tenants, err := s.repo.ListAll()
+	if err != nil {
+		return nil, err
+	}
+	return tenants, nil
 }
 
 func (s *tenantService) Update(tenantCode string, req dto.UpdateTenantRequest) (*dto.TenantResponse, error) {
@@ -153,14 +159,6 @@ func (s *tenantService) Update(tenantCode string, req dto.UpdateTenantRequest) (
 		}
 		return convertToTenantResponse(tenant), nil
 	}
-	//Validate host and port
-	if req.DBHost != dbHostRegex || req.DBPort != dbPortRegex {
-		return nil, errors.New("invalid db host or port")
-	}
-	//Validate user and password
-	if req.DBUser != dbUserRegex || req.DBPass != dbPassRegex {
-		return nil, errors.New("invalid db user or password")
-	}
 	//AESGCMEncrypt db user
 	encryptedUser, err := utils.AESGCMEncrypt(req.DBUser)
 	if err != nil {
@@ -178,9 +176,15 @@ func (s *tenantService) Update(tenantCode string, req dto.UpdateTenantRequest) (
 	tenant.DBPort = req.DBPort
 	tenant.UpdatedAt = time.Now().UTC()
 
-	tenantProvider.EditInstance(tenant)
+	if s.callBackFunction != nil {
+		go func() {
+			s.callBackFunction(enums.EditTenantConnect, tenant.Code, tenant)
+		}()
+	}
 	if err := s.repo.Update(tenant); err != nil {
-		tenantProvider.DeleteInstance(tenant.Code)
+		go func() {
+			s.callBackFunction(enums.DeleteTenantConnect, tenant.Code, tenant)
+		}()
 		return nil, err
 	}
 
@@ -199,6 +203,14 @@ func (s *tenantService) Delete(tenantCode string) error {
 	if err != nil {
 		return err
 	}
-	tenantProvider.DeleteInstance(tenantCode)
+	if s.callBackFunction != nil {
+		go func() {
+			s.callBackFunction(enums.DeleteTenantConnect, tenant.Code, tenant)
+		}()
+	}
 	return s.repo.DeleteByID(tenant.ID)
+}
+
+func (s *tenantService) SetCallBackFunction(callBackFunction CallBackFunction) {
+	s.callBackFunction = callBackFunction
 }

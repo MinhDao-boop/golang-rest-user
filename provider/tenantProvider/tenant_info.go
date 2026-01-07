@@ -1,11 +1,11 @@
 package tenantProvider
 
 import (
-	"golang-rest-user/database"
 	"golang-rest-user/models"
-	"golang-rest-user/provider/jwtProvider"
+	"golang-rest-user/provider/mySqlProvider"
+	"golang-rest-user/provider/serviceProvider"
 	"golang-rest-user/repository"
-	"golang-rest-user/service/tenantSvc"
+	"golang-rest-user/service"
 	"golang-rest-user/utils"
 	"log"
 	"time"
@@ -16,21 +16,21 @@ import (
 type TenantInfo struct {
 	Info        *models.Tenant
 	db          *gorm.DB
-	UserService tenantSvc.UserService
-	AuthService tenantSvc.AuthService
+	UserService service.UserService
+	AuthService service.AuthService
 }
 
 func (t *TenantInfo) Init() error {
 	decryptedDBUser, _ := utils.AESGCMDecrypt(t.Info.DBUser)
 	decryptedDBPass, _ := utils.AESGCMDecrypt(t.Info.DBPass)
 
-	err := database.CreateTenantDB(decryptedDBUser, decryptedDBPass, t.Info.DBHost, t.Info.DBPort, t.Info.DBName)
+	err := mySqlProvider.CreateDB(decryptedDBUser, decryptedDBPass, t.Info.DBHost, t.Info.DBPort, t.Info.DBName)
 	if err != nil {
 		log.Println(err)
 		return err
 	}
 
-	t.db, _ = database.InitTenantDB(decryptedDBUser, decryptedDBPass, t.Info.DBHost, t.Info.DBPort, t.Info.DBName)
+	t.db, _ = mySqlProvider.CreateInstanceDB(decryptedDBUser, decryptedDBPass, t.Info.DBHost, t.Info.DBPort, t.Info.DBName)
 
 	sqlDB, err := t.db.DB()
 	if err == nil {
@@ -45,12 +45,13 @@ func (t *TenantInfo) Init() error {
 }
 
 func (t *TenantInfo) InitService() {
+	appService := serviceProvider.GetInstance()
 
 	userRepo := repository.NewUserRepo(t.db)
-	t.UserService = tenantSvc.NewUserService(t.Info.Code, userRepo)
+	t.UserService = service.NewUserService(t.Info.Code, userRepo)
 
-	jwtManager := jwtProvider.GetInstance()
-	t.AuthService = tenantSvc.NewAuthService(userRepo, jwtManager)
+	jwtManager := appService.JWTManager
+	t.AuthService = service.NewAuthService(userRepo, jwtManager)
 }
 
 func (t *TenantInfo) Migrate() {

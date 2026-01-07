@@ -1,4 +1,4 @@
-package tenantSvc
+package service
 
 import (
 	"crypto/sha256"
