@@ -7,7 +7,6 @@ import (
 	"golang-rest-user/response"
 	"golang-rest-user/utils"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -49,12 +48,16 @@ func CreateTenant(c *gin.Context) {
 			response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusConflict)
 			return
 		}
+		if strings.Contains(err.Error(), "invalid") {
+			response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusConflict)
+			return
+		}
 		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusInternalServerError)
 		return
 	}
 
-	location := c.Request.URL.Path + "/" + strconv.Itoa(int(tenantResponse.ID))
-	c.Header("Location", location)
+	//location := c.Request.URL.Path + "/" + strconv.Itoa(int(tenantResponse.ID))
+	//c.Header("Location", location)
 	response.Success(c, tenantResponse)
 }
 

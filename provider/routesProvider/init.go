@@ -2,14 +2,14 @@ package routesProvider
 
 import (
 	"golang-rest-user/middleware"
-	"golang-rest-user/provider/serviceProvider"
+	"golang-rest-user/provider/jwtProvider"
 	"golang-rest-user/routes"
 
 	"github.com/gin-gonic/gin"
 )
 
 func Init(router *gin.Engine) {
-	appService := serviceProvider.GetInstance()
+	jwtManager := jwtProvider.GetInstance()
 	router.Use(gin.Recovery())
 
 	router.Use(middleware.RequestID())
@@ -24,6 +24,6 @@ func Init(router *gin.Engine) {
 	routes.AuthRoutes(auth)
 
 	users := v1.Group("/users")
-	users.Use(middleware.AuthMiddleware(appService.JWTManager))
+	users.Use(middleware.AuthMiddleware(jwtManager))
 	routes.UserRoutes(users)
 }

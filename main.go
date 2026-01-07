@@ -1,8 +1,9 @@
 package main
 
 import (
-	"golang-rest-user/config"
+	"golang-rest-user/provider/jwtProvider"
 	"golang-rest-user/provider/mySqlProvider"
+	"golang-rest-user/provider/redisProvider"
 	"golang-rest-user/provider/routesProvider"
 	"golang-rest-user/provider/serviceProvider"
 	"golang-rest-user/provider/tenantProvider"
@@ -12,15 +13,16 @@ import (
 
 func main() {
 
-	config.InitRedis()
+	redisProvider.Init()
 	mySqlProvider.Init()
+	jwtProvider.Init()
 	r := gin.Default()
 
 	serviceProvider.Init()
 
-	tntCntSvc := serviceProvider.GetInstance().TenantConnectService
+	tenantConnectSvc := serviceProvider.GetInstance().TenantConnectService
 
-	tenantProvider.Init(tntCntSvc)
+	tenantProvider.Init(tenantConnectSvc)
 
 	routesProvider.Init(r)
 

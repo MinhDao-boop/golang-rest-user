@@ -1,6 +1,8 @@
 package middleware
 
 import (
+	"golang-rest-user/enums"
+	"golang-rest-user/provider/redisProvider"
 	"golang-rest-user/response"
 	"golang-rest-user/security"
 	"net/http"
@@ -26,6 +28,16 @@ func AuthMiddleware(jwtManager *security.Manager) gin.HandlerFunc {
 			return
 		}
 
+		if err != nil || claims.Type != enums.TokenTypeAccess {
+			response.Error(c, response.CodeBadRequest, "Invalid access token", nil, http.StatusUnauthorized)
+			return
+		}
+		tokenVer := claims.Version
+		currentVer := redisProvider.GetTokenVer(claims.UserID, claims.TenantCode)
+		if tokenVer != currentVer {
+			response.Error(c, response.CodeBadRequest, "Unauthorized", nil, http.StatusUnauthorized)
+			return
+		}
 		c.Set("user_id", claims.UserID)
 		c.Set("tenant_code", claims.TenantCode)
 

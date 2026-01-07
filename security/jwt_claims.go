@@ -1,18 +1,21 @@
 package security
 
 import (
+	"golang-rest-user/enums"
+
 	"github.com/golang-jwt/jwt/v5"
 )
 
 type Claims struct {
-	UserID     uint   `json:"user_id"`
-	Username   string `json:"username"`
-	TenantCode string `json:"tenant_code"`
-	Type       string `json:"type"`
+	Username   string          `json:"username"`
+	UserID     uint            `json:"user_id"`
+	TenantCode string          `json:"tenant_code"`
+	Version    int             `json:"ver"`
+	Type       enums.TokenType `json:"type"`
 	jwt.RegisteredClaims
 }
 
 type TokenResult struct {
 	Token     string
-	ExpiresIn int64
+	ExpiresIn int
 }

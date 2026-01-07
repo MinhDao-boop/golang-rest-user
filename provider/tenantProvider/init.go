@@ -35,6 +35,8 @@ func AddInstance(tenant *models.Tenant) {
 }
 
 func DeleteInstance(tenantCode string) {
+	temp := instance[tenantCode]
+	temp.Destruction()
 	instance[tenantCode] = nil
 	delete(instance, tenantCode)
 }

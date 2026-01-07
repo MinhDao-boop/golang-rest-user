@@ -1,9 +1,11 @@
 package security
 
 import (
+	"golang-rest-user/enums"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 )
 
 type Manager struct {
@@ -14,16 +16,20 @@ func NewManager(jwtConfig *JWTConfig) *Manager {
 	return &Manager{jwtConfig: jwtConfig}
 }
 
-func (m *Manager) GenerateAccessToken(userID uint, username, tenantCode string) (*TokenResult, error) {
+func (m *Manager) GenerateToken(userID uint, username, tenantCode string, tokenType enums.TokenType, ttl, ver int) (*TokenResult, error) {
+	jti, _ := uuid.NewUUID()
 	claims := &Claims{
-		UserID:     userID,
 		Username:   username,
+		UserID:     userID,
 		TenantCode: tenantCode,
-		Type:       "access",
+		Type:       tokenType,
+		Version:    ver,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    m.jwtConfig.Issuer,
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(m.jwtConfig.AccessTokenTTL)),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Duration(ttl) * time.Second)),
+			NotBefore: jwt.NewNumericDate(time.Now()),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			ID:        jti.String(),
 		},
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
@@ -33,29 +39,7 @@ func (m *Manager) GenerateAccessToken(userID uint, username, tenantCode string) 
 	}
 	return &TokenResult{
 		Token:     signed,
-		ExpiresIn: int64(m.jwtConfig.AccessTokenTTL.Seconds()),
-	}, nil
-}
-
-func (m *Manager) GenerateRefreshToken(userID uint, tenantCode string) (*TokenResult, error) {
-	rClaims := &Claims{
-		UserID:     userID,
-		TenantCode: tenantCode,
-		Type:       "refresh",
-		RegisteredClaims: jwt.RegisteredClaims{
-			Issuer:    m.jwtConfig.Issuer,
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(m.jwtConfig.RefreshTokenTTL)),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-		},
-	}
-	rToken := jwt.NewWithClaims(jwt.SigningMethodHS256, rClaims)
-	signed, err := rToken.SignedString(m.jwtConfig.SecretKey)
-	if err != nil {
-		return nil, err
-	}
-	return &TokenResult{
-		Token:     signed,
-		ExpiresIn: int64(m.jwtConfig.RefreshTokenTTL.Seconds()),
+		ExpiresIn: ttl,
 	}, nil
 }
 

@@ -6,7 +6,6 @@ import (
 	"golang-rest-user/response"
 	"golang-rest-user/utils"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -61,8 +60,8 @@ func CreateUser(c *gin.Context) {
 		return
 	}
 
-	location := c.Request.URL.Path + "/" + strconv.FormatUint(uint64(userResponse.ID), 10)
-	c.Header("Location", location)
+	//location := c.Request.URL.Path + "/" + strconv.FormatUint(uint64(userResponse.ID), 10)
+	//c.Header("Location", location)
 	response.Success(c, userResponse)
 }
 

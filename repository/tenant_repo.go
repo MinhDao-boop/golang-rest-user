@@ -14,6 +14,7 @@ type TenantRepo interface {
 	Update(tenant *models.Tenant) error
 	DeleteByID(id uint) error
 	GetByTenantCode(tenantCode string) (*models.Tenant, error)
+	GetByDBName(tenantCode string) (*models.Tenant, error)
 	RecoverDeleted(id uint) error
 	FindDeletedByCode(string) (*models.Tenant, error)
 }
@@ -41,6 +42,14 @@ func (r *tenantRepo) GetByID(id uint) (*models.Tenant, error) {
 func (r *tenantRepo) GetByTenantCode(tenantCode string) (*models.Tenant, error) {
 	var t models.Tenant
 	if err := r.db.Where("code = ?", tenantCode).First(&t).Error; err != nil {
+		return nil, err
+	}
+	return &t, nil
+}
+
+func (r *tenantRepo) GetByDBName(dbName string) (*models.Tenant, error) {
+	var t models.Tenant
+	if err := r.db.Where("db_name = ?", dbName).First(&t).Error; err != nil {
 		return nil, err
 	}
 	return &t, nil

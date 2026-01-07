@@ -16,6 +16,7 @@ func TenantDBMiddleware() gin.HandlerFunc {
 			response.Error(c, response.CodeBadRequest, "X-Tenant-Code header is required", nil, http.StatusInternalServerError)
 			return
 		}
+		c.Set("TENANT_CODE", tenantCode)
 		c.Next()
 	}
 }

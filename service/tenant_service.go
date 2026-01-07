@@ -5,14 +5,20 @@ import (
 	"golang-rest-user/models"
 	"golang-rest-user/provider/tenantProvider"
 	"golang-rest-user/utils"
+	"os"
+	"regexp"
 	"strings"
 
 	"golang-rest-user/dto"
 	"golang-rest-user/repository"
 	"time"
-
-	"gorm.io/gorm"
 )
+
+var dbnameRegex = regexp.MustCompile("^[a-z0-9_]{1,64}$")
+var dbHostRegex = os.Getenv("DB_HOST")
+var dbPortRegex = os.Getenv("DB_PORT")
+var dbUserRegex = os.Getenv("DB_USER")
+var dbPassRegex = os.Getenv("DB_PASS")
 
 type TenantService interface {
 	Create(dto.CreateTenantRequest) (*dto.TenantResponse, error)
@@ -44,14 +50,30 @@ func convertToTenantResponse(tenant *models.Tenant) *dto.TenantResponse {
 	}
 }
 
+func isValidDBName(name string) bool {
+	return dbnameRegex.MatchString(name)
+}
+
 func (s *tenantService) Create(req dto.CreateTenantRequest) (*dto.TenantResponse, error) {
-	// check db name existing
+	// check tenant code existing
 	if _, err := s.repo.GetByTenantCode(req.Code); err == nil {
 		return nil, errors.New("tenant code already exists")
-	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-		// if other error (like DB err), still return it
-		return nil, err
-		// continue if record not found
+	}
+	//check db name existing
+	if _, err := s.repo.GetByDBName(req.DBName); err == nil {
+		return nil, errors.New("db name already exists")
+	}
+	//Validate dbname
+	if !isValidDBName(req.DBName) {
+		return nil, errors.New("invalid db name")
+	}
+	//Validate host and port
+	if req.DBHost != dbHostRegex || req.DBPort != dbPortRegex {
+		return nil, errors.New("invalid db host or port")
+	}
+	//Validate user and password
+	if req.DBUser != dbUserRegex || req.DBPass != dbPassRegex {
+		return nil, errors.New("invalid db user or password")
 	}
 	//AESGCMEncrypt db user
 	encryptedUser, err := utils.AESGCMEncrypt(req.DBUser)
@@ -73,11 +95,11 @@ func (s *tenantService) Create(req dto.CreateTenantRequest) (*dto.TenantResponse
 		DBName:    req.DBName,
 		CreatedAt: time.Now().UTC(),
 	}
+	tenantProvider.AddInstance(tenant)
 	if err := s.repo.Create(tenant); err != nil {
+		tenantProvider.DeleteInstance(tenant.Code)
 		return nil, err
 	}
-	tenantProvider.AddInstance(tenant)
-
 	return convertToTenantResponse(tenant), nil
 }
 
@@ -130,6 +152,14 @@ func (s *tenantService) Update(tenantCode string, req dto.UpdateTenantRequest) (
 			return nil, err
 		}
 		return convertToTenantResponse(tenant), nil
+	}
+	//Validate host and port
+	if req.DBHost != dbHostRegex || req.DBPort != dbPortRegex {
+		return nil, errors.New("invalid db host or port")
+	}
+	//Validate user and password
+	if req.DBUser != dbUserRegex || req.DBPass != dbPassRegex {
+		return nil, errors.New("invalid db user or password")
 	}
 	//AESGCMEncrypt db user
 	encryptedUser, err := utils.AESGCMEncrypt(req.DBUser)

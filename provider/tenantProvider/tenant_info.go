@@ -3,8 +3,8 @@ package tenantProvider
 import (
 	"golang-rest-user/database"
 	"golang-rest-user/models"
+	"golang-rest-user/provider/jwtProvider"
 	"golang-rest-user/repository"
-	"golang-rest-user/security"
 	"golang-rest-user/service/tenantSvc"
 	"golang-rest-user/utils"
 	"log"
@@ -21,16 +21,16 @@ type TenantInfo struct {
 }
 
 func (t *TenantInfo) Init() error {
-	t.Info.DBUser, _ = utils.AESGCMDecrypt(t.Info.DBUser)
-	t.Info.DBPass, _ = utils.AESGCMDecrypt(t.Info.DBPass)
+	decryptedDBUser, _ := utils.AESGCMDecrypt(t.Info.DBUser)
+	decryptedDBPass, _ := utils.AESGCMDecrypt(t.Info.DBPass)
 
-	err := database.CreateTenantDB(t.Info.DBUser, t.Info.DBPass, t.Info.DBHost, t.Info.DBPort, t.Info.DBName)
+	err := database.CreateTenantDB(decryptedDBUser, decryptedDBPass, t.Info.DBHost, t.Info.DBPort, t.Info.DBName)
 	if err != nil {
 		log.Println(err)
 		return err
 	}
 
-	t.db, _ = database.InitTenantDB(t.Info.DBUser, t.Info.DBPass, t.Info.DBHost, t.Info.DBPort, t.Info.DBName)
+	t.db, _ = database.InitTenantDB(decryptedDBUser, decryptedDBPass, t.Info.DBHost, t.Info.DBPort, t.Info.DBName)
 
 	sqlDB, err := t.db.DB()
 	if err == nil {
@@ -49,10 +49,8 @@ func (t *TenantInfo) InitService() {
 	userRepo := repository.NewUserRepo(t.db)
 	t.UserService = tenantSvc.NewUserService(t.Info.Code, userRepo)
 
-	jwtConfig := security.LoadJWTConfig()
-	jwtManager := security.NewManager(jwtConfig)
-	refreshTokenRedis := repository.NewRefreshTokenRedisRepo()
-	t.AuthService = tenantSvc.NewAuthService(userRepo, refreshTokenRedis, jwtManager)
+	jwtManager := jwtProvider.GetInstance()
+	t.AuthService = tenantSvc.NewAuthService(userRepo, jwtManager)
 }
 
 func (t *TenantInfo) Migrate() {
@@ -61,4 +59,12 @@ func (t *TenantInfo) Migrate() {
 	if err != nil {
 		log.Println(err)
 	}
+}
+
+func (t *TenantInfo) Destruction() {
+	db, err := t.db.DB()
+	if err != nil {
+		log.Println(err)
+	}
+	defer db.Close()
 }

@@ -1,28 +1,34 @@
-package repository
+package redisProvider
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"time"
 
-	"golang-rest-user/config"
+	"github.com/redis/go-redis/v9"
 )
 
-type RefreshTokenRedis interface {
-	Create(tokenHash string, userID uint, tenantCode string, ttl time.Duration) error
-	FindValidByHash(tokenHash string, tenantCode string, userID uint) error
-	Revoke(tokenHash string, tenantCode string, userID uint) error
-	RevokeAllByUser(tenantCode string, userID uint) error
+var (
+	client *redis.Client
+	ctx    = context.Background()
+)
+
+func Init() {
+	client = redis.NewClient(&redis.Options{
+		Addr: os.Getenv("REDIS_ADDR"),
+		DB:   0,
+	})
+
+	if err := client.Ping(ctx).Err(); err != nil {
+		panic("redis connection failed:" + err.Error())
+	}
 }
 
-type RefreshTokenRedisRepo struct{}
-
-func NewRefreshTokenRedisRepo() RefreshTokenRedis {
-	return &RefreshTokenRedisRepo{}
+func GetClient() *redis.Client {
+	return client
 }
-
-/* -------------------- key helpers -------------------- */
 
 func refreshKey(tenant string, userID uint, tokenHash string) string {
 	return fmt.Sprintf(
@@ -41,16 +47,20 @@ func userRefreshSetKey(tenant string, userID uint) string {
 	)
 }
 
-/* -------------------- methods -------------------- */
+func userTokenVersion(tenant string, userID uint) string {
+	return fmt.Sprintf(
+		"auth:{%s}:user:%d:token_ver",
+		tenant,
+		userID,
+	)
+}
 
-func (r *RefreshTokenRedisRepo) Create(tokenHash string, userID uint, tenantCode string, ttl time.Duration) error {
-
-	ctx := context.Background()
+func Create(tokenHash string, userID uint, tenantCode string, ttl time.Duration) error {
 
 	refreshKey := refreshKey(tenantCode, userID, tokenHash)
 	userSetKey := userRefreshSetKey(tenantCode, userID)
 
-	pipe := config.RDB.TxPipeline()
+	pipe := client.TxPipeline()
 
 	pipe.HSet(ctx, refreshKey, map[string]interface{}{
 		"user_id":     userID,
@@ -65,12 +75,11 @@ func (r *RefreshTokenRedisRepo) Create(tokenHash string, userID uint, tenantCode
 	return err
 }
 
-func (r *RefreshTokenRedisRepo) FindValidByHash(tokenHash string, tenantCode string, userID uint) error {
+func FindValidByHash(tokenHash string, tenantCode string, userID uint) error {
 
-	ctx := context.Background()
 	key := refreshKey(tenantCode, userID, tokenHash)
 
-	exists, err := config.RDB.Exists(ctx, key).Result()
+	exists, err := client.Exists(ctx, key).Result()
 	if err != nil {
 		return err
 	}
@@ -80,14 +89,12 @@ func (r *RefreshTokenRedisRepo) FindValidByHash(tokenHash string, tenantCode str
 	return nil
 }
 
-func (r *RefreshTokenRedisRepo) Revoke(tokenHash string, tenantCode string, userID uint) error {
-
-	ctx := context.Background()
+func Revoke(tokenHash string, tenantCode string, userID uint) error {
 
 	refreshKey := refreshKey(tenantCode, userID, tokenHash)
 	userSetKey := userRefreshSetKey(tenantCode, userID)
 
-	pipe := config.RDB.TxPipeline()
+	pipe := client.TxPipeline()
 	pipe.Del(ctx, refreshKey)
 	pipe.SRem(ctx, userSetKey, tokenHash)
 
@@ -95,17 +102,16 @@ func (r *RefreshTokenRedisRepo) Revoke(tokenHash string, tenantCode string, user
 	return err
 }
 
-func (r *RefreshTokenRedisRepo) RevokeAllByUser(tenantCode string, userID uint) error {
+func RevokeAllByUser(tenantCode string, userID uint) error {
 
-	ctx := context.Background()
 	userSetKey := userRefreshSetKey(tenantCode, userID)
 
-	tokens, err := config.RDB.SMembers(ctx, userSetKey).Result()
+	tokens, err := client.SMembers(ctx, userSetKey).Result()
 	if err != nil {
 		return err
 	}
 
-	pipe := config.RDB.TxPipeline()
+	pipe := client.TxPipeline()
 	for _, token := range tokens {
 		pipe.Del(ctx, refreshKey(tenantCode, userID, token))
 	}
@@ -113,4 +119,19 @@ func (r *RefreshTokenRedisRepo) RevokeAllByUser(tenantCode string, userID uint) 
 
 	_, err = pipe.Exec(ctx)
 	return err
+}
+
+func GetTokenVer(userID uint, tenantCode string) int {
+	key := userTokenVersion(tenantCode, userID)
+	val, err := client.Get(ctx, key).Int()
+	if errors.Is(err, redis.Nil) {
+		client.Set(ctx, key, 1, 0)
+		return 1
+	}
+	return val
+}
+
+func IncreaseTokenVer(userID uint, tenantCode string) error {
+	key := userTokenVersion(tenantCode, userID)
+	return client.Incr(ctx, key).Err()
 }

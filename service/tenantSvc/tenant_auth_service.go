@@ -4,6 +4,8 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"golang-rest-user/enums"
+	"golang-rest-user/provider/redisProvider"
 	"golang-rest-user/utils"
 	"time"
 
@@ -18,22 +20,19 @@ import (
 type AuthService interface {
 	Register(req dto.CreateUserRequest) (*dto.UserResponse, error)
 	Login(tenantCode string, req dto.LoginRequest) (map[string]interface{}, error)
-	Refresh(string) (map[string]interface{}, error)
-	Logout(refreshToken string) error
+	Refresh(tenantCode, refreshToken string) (map[string]interface{}, error)
+	Logout(tenantCode, refreshToken string) error
 }
 
 type authService struct {
-	userRepo         repository.UserRepo
-	refreshTokenRepo repository.RefreshTokenRedis
-	jwtManager       *security.Manager
+	userRepo   repository.UserRepo
+	jwtManager *security.Manager
 }
 
-func NewAuthService(userRepo repository.UserRepo, refreshTokenRepo repository.RefreshTokenRedis,
-	jwtManager *security.Manager) AuthService {
+func NewAuthService(userRepo repository.UserRepo, jwtManager *security.Manager) AuthService {
 	return &authService{
-		userRepo:         userRepo,
-		refreshTokenRepo: refreshTokenRepo,
-		jwtManager:       jwtManager,
+		userRepo:   userRepo,
+		jwtManager: jwtManager,
 	}
 }
 
@@ -62,6 +61,7 @@ func (s *authService) Register(req dto.CreateUserRequest) (*dto.UserResponse, er
 }
 
 func (s *authService) Login(tenantCode string, req dto.LoginRequest) (map[string]interface{}, error) {
+
 	user, err := s.userRepo.GetByUsername(req.Username)
 	if err != nil {
 		return nil, errors.New("invalid credentials")
@@ -72,12 +72,14 @@ func (s *authService) Login(tenantCode string, req dto.LoginRequest) (map[string
 		return nil, errors.New("invalid credentials")
 	}
 
-	aToken, err := s.jwtManager.GenerateAccessToken(user.ID, user.Username, tenantCode)
+	ver := redisProvider.GetTokenVer(user.ID, tenantCode)
+
+	aToken, err := s.jwtManager.GenerateToken(user.ID, user.Username, tenantCode, enums.TokenTypeAccess, 900, ver)
 	if err != nil {
 		return nil, err
 	}
 
-	rToken, err := s.jwtManager.GenerateRefreshToken(user.ID, tenantCode)
+	rToken, err := s.jwtManager.GenerateToken(user.ID, user.Username, tenantCode, enums.TokenTypeRefresh, 604800, ver)
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +87,7 @@ func (s *authService) Login(tenantCode string, req dto.LoginRequest) (map[string
 	hash := hashToken(rToken.Token)
 	ttl := time.Duration(rToken.ExpiresIn) * time.Second
 
-	err = s.refreshTokenRepo.Create(hash, user.ID, tenantCode, ttl)
+	err = redisProvider.Create(hash, user.ID, tenantCode, ttl)
 	if err != nil {
 		return nil, err
 	}
@@ -103,35 +105,39 @@ func hashToken(rToken string) string {
 	return hex.EncodeToString(h[:])
 }
 
-func (s *authService) Refresh(rToken string) (map[string]interface{}, error) {
+func (s *authService) Refresh(tenantCode, rToken string) (map[string]interface{}, error) {
 	claims, err := s.jwtManager.ParseToken(rToken)
 
 	if claims == nil {
 		return nil, errors.New("invalid token")
 	}
 
-	if err != nil || claims.Type != "refresh" {
+	if err != nil || claims.Type != enums.TokenTypeRefresh {
 		return nil, errors.New("invalid refresh token")
 	}
 
-	if err := s.refreshTokenRepo.FindValidByHash(hashToken(rToken), claims.TenantCode, claims.UserID); err != nil {
+	if tenantCode != claims.TenantCode {
+		return nil, errors.New("invalid refresh token")
+	}
+
+	if err := redisProvider.FindValidByHash(hashToken(rToken), claims.TenantCode, claims.UserID); err != nil {
 		return nil, errors.New("refresh token revoked")
 	}
 
+	ver := redisProvider.GetTokenVer(claims.UserID, claims.TenantCode)
+
 	//revoke old refresh token
-	if err = s.refreshTokenRepo.Revoke(hashToken(rToken), claims.TenantCode, claims.UserID); err != nil {
+	if err = redisProvider.Revoke(hashToken(rToken), claims.TenantCode, claims.UserID); err != nil {
 		return nil, err
 	}
 
-	user, _ := s.userRepo.GetByID(claims.UserID)
-
-	newAToken, _ := s.jwtManager.GenerateAccessToken(claims.UserID, user.Username, claims.TenantCode)
-	newRToken, _ := s.jwtManager.GenerateRefreshToken(claims.UserID, claims.TenantCode)
+	newAToken, _ := s.jwtManager.GenerateToken(claims.UserID, claims.Username, claims.TenantCode, enums.TokenTypeAccess, 900, ver)
+	newRToken, _ := s.jwtManager.GenerateToken(claims.UserID, claims.Username, claims.TenantCode, enums.TokenTypeRefresh, 604800, ver)
 
 	hash := hashToken(newRToken.Token)
 	ttl := time.Duration(newRToken.ExpiresIn) * time.Second
 
-	if err = s.refreshTokenRepo.Create(hash, claims.UserID, claims.TenantCode, ttl); err != nil {
+	if err = redisProvider.Create(hash, claims.UserID, claims.TenantCode, ttl); err != nil {
 		return nil, err
 	}
 
@@ -143,14 +149,21 @@ func (s *authService) Refresh(rToken string) (map[string]interface{}, error) {
 	}, nil
 }
 
-func (s *authService) Logout(rToken string) error {
+func (s *authService) Logout(tenantCode, rToken string) error {
 	claims, err := s.jwtManager.ParseToken(rToken)
 	if claims == nil {
 		return errors.New("invalid token")
 	}
-	if err != nil || claims.Type != "refresh" {
+	if err != nil || claims.Type != enums.TokenTypeRefresh {
+		return errors.New("invalid refresh token")
+	}
+	if tenantCode != claims.TenantCode {
 		return errors.New("invalid refresh token")
 	}
 
-	return s.refreshTokenRepo.RevokeAllByUser(claims.TenantCode, claims.UserID)
+	if err := redisProvider.IncreaseTokenVer(claims.UserID, claims.TenantCode); err != nil {
+		return err
+	}
+
+	return redisProvider.RevokeAllByUser(claims.TenantCode, claims.UserID)
 }

@@ -12,7 +12,7 @@ import (
 
 // POST /auth/register
 func Register(c *gin.Context) {
-	tenantCode := c.GetHeader("X-Tenant-Code")
+	tenantCode := c.GetString("TENANT_CODE")
 	if tenantCode == "" {
 		return
 	}
@@ -35,7 +35,7 @@ func Register(c *gin.Context) {
 
 // POST /auth/login
 func Login(c *gin.Context) {
-	tenantCode := c.GetHeader("X-Tenant-Code")
+	tenantCode := c.GetString("TENANT_CODE")
 	if tenantCode == "" {
 		return
 	}
@@ -57,7 +57,7 @@ func Login(c *gin.Context) {
 
 // POST /auth/refresh
 func Refresh(c *gin.Context) {
-	tenantCode := c.GetHeader("X-Tenant-Code")
+	tenantCode := c.GetString("TENANT_CODE")
 	if tenantCode == "" {
 		return
 	}
@@ -68,7 +68,7 @@ func Refresh(c *gin.Context) {
 		return
 	}
 
-	tokens, err := service.AuthService.Refresh(req.RefreshToken)
+	tokens, err := service.AuthService.Refresh(tenantCode, req.RefreshToken)
 	if err != nil {
 		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusUnauthorized)
 		return
@@ -78,7 +78,7 @@ func Refresh(c *gin.Context) {
 
 // POST /auth/logout
 func Logout(c *gin.Context) {
-	tenantCode := c.GetHeader("X-Tenant-Code")
+	tenantCode := c.GetString("TENANT_CODE")
 	if tenantCode == "" {
 		return
 	}
@@ -89,7 +89,7 @@ func Logout(c *gin.Context) {
 		return
 	}
 
-	if err := service.AuthService.Logout(req.RefreshToken); err != nil {
+	if err := service.AuthService.Logout(tenantCode, req.RefreshToken); err != nil {
 		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusUnauthorized)
 		return
 	}
