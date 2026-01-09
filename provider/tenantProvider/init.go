@@ -50,6 +50,13 @@ func EditInstance(tenant *models.Tenant) {
 	AddInstance(tenant)
 }
 
+func DropInstance(tenantCode string) {
+	temp := instance[tenantCode]
+	temp.Drop()
+	instance[tenantCode] = nil
+	delete(instance, tenantCode)
+}
+
 func HandleTenant(mode enums.HandleTenant, tenantCode string, tenant *models.Tenant) {
 	switch mode {
 	case enums.AddTenantConnect:
@@ -60,6 +67,9 @@ func HandleTenant(mode enums.HandleTenant, tenantCode string, tenant *models.Ten
 		break
 	case enums.DeleteTenantConnect:
 		DeleteInstance(tenantCode)
+		break
+	case enums.DropTenantConnect:
+		DropInstance(tenantCode)
 		break
 	default:
 		fmt.Println("Cannot handle tenant mode", mode)

@@ -49,7 +49,7 @@ func (r *tenantRepo) GetByTenantCode(tenantCode string) (*models.Tenant, error) 
 
 func (r *tenantRepo) GetByDBName(dbName string) (*models.Tenant, error) {
 	var t models.Tenant
-	if err := r.db.Where("db_name = ?", dbName).First(&t).Error; err != nil {
+	if err := r.db.Unscoped().Where("db_name = ?", dbName).First(&t).Error; err != nil {
 		return nil, err
 	}
 	return &t, nil

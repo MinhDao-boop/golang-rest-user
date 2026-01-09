@@ -69,3 +69,12 @@ func (t *TenantInfo) Destruction() {
 	}
 	defer db.Close()
 }
+
+func (t *TenantInfo) Drop() {
+	db, err := t.db.DB()
+	if err != nil {
+		log.Println(err)
+	}
+	defer db.Close()
+	db.Exec("DROP TABLE IF EXISTS %s", t.Info.DBName)
+}

@@ -78,15 +78,15 @@ func (s *tenantService) Create(req dto.CreateTenantRequest) (*dto.TenantResponse
 		return nil, err
 	}
 	tenant := &models.Tenant{
-		Code:      req.Code,
-		Name:      req.Name,
-		DBUser:    encryptedUser,
-		DBPass:    encryptedPass,
-		DBHost:    req.DBHost,
-		DBPort:    req.DBPort,
-		DBName:    req.DBName,
-		CreatedAt: time.Now().UTC(),
+		Code:   req.Code,
+		Name:   req.Name,
+		DBUser: encryptedUser,
+		DBPass: encryptedPass,
+		DBHost: req.DBHost,
+		DBPort: req.DBPort,
+		DBName: req.DBName,
 	}
+	tenant.CreatedAt = time.Now()
 	if s.callBackFunction != nil {
 		go func() {
 			s.callBackFunction(enums.AddTenantConnect, tenant.Code, tenant)
@@ -94,7 +94,7 @@ func (s *tenantService) Create(req dto.CreateTenantRequest) (*dto.TenantResponse
 	}
 	if err := s.repo.Create(tenant); err != nil {
 		go func() {
-			s.callBackFunction(enums.DeleteTenantConnect, tenant.Code, tenant)
+			s.callBackFunction(enums.DropTenantConnect, tenant.Code, tenant)
 		}()
 		return nil, err
 	}
@@ -183,7 +183,7 @@ func (s *tenantService) Update(tenantCode string, req dto.UpdateTenantRequest) (
 	}
 	if err := s.repo.Update(tenant); err != nil {
 		go func() {
-			s.callBackFunction(enums.DeleteTenantConnect, tenant.Code, tenant)
+			s.callBackFunction(enums.DropTenantConnect, tenant.Code, tenant)
 		}()
 		return nil, err
 	}
@@ -208,7 +208,7 @@ func (s *tenantService) Delete(tenantCode string) error {
 			s.callBackFunction(enums.DeleteTenantConnect, tenant.Code, tenant)
 		}()
 	}
-	return s.repo.DeleteByID(tenant.ID)
+	return s.repo.DeleteByID(tenant.BaseModel.ID)
 }
 
 func (s *tenantService) SetCallBackFunction(callBackFunction CallBackFunction) {
