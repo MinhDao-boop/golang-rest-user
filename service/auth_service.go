@@ -117,7 +117,7 @@ func (s *authService) Refresh(tenantCode, rToken string) (map[string]interface{}
 	}
 
 	if tenantCode != claims.TenantCode {
-		return nil, errors.New("invalid refresh token")
+		return nil, errors.New("invalid tenant code")
 	}
 
 	if err := redisProvider.FindValidByHash(hashToken(rToken), claims.TenantCode, claims.UserID); err != nil {
@@ -158,7 +158,7 @@ func (s *authService) Logout(tenantCode, rToken string) error {
 		return errors.New("invalid refresh token")
 	}
 	if tenantCode != claims.TenantCode {
-		return errors.New("invalid refresh token")
+		return errors.New("invalid tenant code")
 	}
 
 	if err := redisProvider.IncreaseTokenVer(claims.UserID, claims.TenantCode); err != nil {

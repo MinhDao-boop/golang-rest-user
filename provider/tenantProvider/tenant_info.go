@@ -18,6 +18,7 @@ type TenantInfo struct {
 	db          *gorm.DB
 	UserService service.UserService
 	AuthService service.AuthService
+	ZoneService service.ZoneService
 }
 
 func (t *TenantInfo) Init() error {
@@ -52,11 +53,19 @@ func (t *TenantInfo) InitService() {
 
 	jwtManager := appService.JWTManager
 	t.AuthService = service.NewAuthService(userRepo, jwtManager)
+
+	zoneRepo := repository.NewZoneRepo(t.db)
+	userZoneRepo := repository.NewUserZoneRepo(t.db)
+	t.ZoneService = service.NewZoneService(zoneRepo, userZoneRepo)
 }
 
 func (t *TenantInfo) Migrate() {
 
-	err := t.db.AutoMigrate(&models.User{})
+	err := t.db.AutoMigrate(
+		&models.User{},
+		&models.Zone{},
+		&models.UserZone{},
+	)
 	if err != nil {
 		log.Println(err)
 	}

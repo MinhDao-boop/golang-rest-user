@@ -20,6 +20,6 @@ type ZoneDTOResponse struct {
 	Path      string         `json:"path"`
 	Level     int            `json:"level"`
 	Metadata  datatypes.JSON `Gorm:"type:json"`
-	CreatedAt time.Time      `Gorm:"type:datetime;default:CURRENT_TIMESTAMP"`
+	CreatedAt time.Time      `Gorm:"type:datetime"`
 	UpdatedAt time.Time      `Gorm:"type:datetime"`
 }

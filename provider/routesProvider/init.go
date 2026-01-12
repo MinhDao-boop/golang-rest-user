@@ -27,4 +27,8 @@ func Init(router *gin.Engine) {
 	users := v1.Group("/users")
 	users.Use(middleware.AuthMiddleware(jwtManager))
 	routes.UserRoutes(users)
+
+	zones := v1.Group("/zones")
+	zones.Use(middleware.AuthMiddleware(jwtManager))
+	routes.ZonesRoutes(zones)
 }

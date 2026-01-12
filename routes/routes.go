@@ -29,3 +29,7 @@ func AuthRoutes(r *gin.RouterGroup) {
 	r.POST("/logout", tenant.Logout)     // POST /api/v1/auth/logout
 	r.POST("/refresh", tenant.Refresh)   // POST /api/v1/auth/refresh
 }
+
+func ZonesRoutes(r *gin.RouterGroup) {
+	r.POST("", tenant.CreateZone) // POST /api/v1/zones
+}

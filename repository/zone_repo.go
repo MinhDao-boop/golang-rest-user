@@ -13,8 +13,6 @@ type ZoneRepo interface {
 	GetByID(uint) (*models.Zone, error)
 	GetByPaths([]string) ([]models.Zone, error)
 	UpdateZonePath(uint, string) error
-	AddUserPermission(*models.UserZone) error
-	GetUserZones(userID uint) ([]models.UserZone, error)
 }
 
 type zoneRepoImpl struct {
@@ -46,20 +44,8 @@ func (r *zoneRepoImpl) GetByID(id uint) (*models.Zone, error) {
 }
 
 func (r *zoneRepoImpl) UpdateZonePath(newZoneID uint, newZonePath string) error {
-	return r.db.Where("id = ?", newZoneID).
+	return r.db.Model(&models.Zone{}).Where("id = ?", newZoneID).
 		Update("path", newZonePath).Error
-}
-
-func (r *zoneRepoImpl) AddUserPermission(userZone *models.UserZone) error {
-	return r.db.Create(userZone).Error
-}
-
-func (r *zoneRepoImpl) GetUserZones(userID uint) (userZones []models.UserZone, err error) {
-	if err := r.db.Where("user_id = ?", userID).
-		Find(&userZones).Error; err != nil {
-		return nil, err
-	}
-	return userZones, nil
 }
 
 func (r *zoneRepoImpl) GetByPaths(paths []string) ([]models.Zone, error) {
