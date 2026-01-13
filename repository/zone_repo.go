@@ -11,12 +11,22 @@ type ZoneRepo interface {
 	Update(*models.Zone) error
 	DeleteByIDs([]uint) (deleted int64, err error)
 	GetByID(uint) (*models.Zone, error)
-	GetByPaths([]string) ([]models.Zone, error)
+	GetByName(string) (*models.Zone, error)
 	UpdateZonePath(uint, string) error
+	GetSubtreeByPath(path string) ([]models.Zone, error)
 }
 
 type zoneRepoImpl struct {
 	db *gorm.DB
+}
+
+func (r *zoneRepoImpl) GetSubtreeByPath(path string) ([]models.Zone, error) {
+	var zones []models.Zone
+	err := r.db.Where("path LIKE ?", path+"%").Order("level ASC").Find(&zones).Error
+	if err != nil {
+		return nil, err
+	}
+	return zones, nil
 }
 
 func NewZoneRepo(db *gorm.DB) ZoneRepo {
@@ -43,19 +53,23 @@ func (r *zoneRepoImpl) GetByID(id uint) (*models.Zone, error) {
 	return &zone, nil
 }
 
+func (r *zoneRepoImpl) GetByName(name string) (*models.Zone, error) {
+	var zone models.Zone
+	if err := r.db.Where("name = ?", name).First(&zone).Error; err != nil {
+		return nil, err
+	}
+	return &zone, nil
+}
+
 func (r *zoneRepoImpl) UpdateZonePath(newZoneID uint, newZonePath string) error {
 	return r.db.Model(&models.Zone{}).Where("id = ?", newZoneID).
 		Update("path", newZonePath).Error
 }
 
-func (r *zoneRepoImpl) GetByPaths(paths []string) ([]models.Zone, error) {
+func (r *zoneRepoImpl) GetByPath(path string) ([]models.Zone, error) {
 	var zones []models.Zone
-	for _, path := range paths {
-		var zone models.Zone
-		if err := r.db.Where("path LIKE ?", path).First(&zone).Error; err != nil {
-			return nil, err
-		}
-		zones = append(zones, zone)
+	if err := r.db.Where("path LIKE ?", path+"%").Order("level ASC").Find(&zones).Error; err != nil {
+		return nil, err
 	}
 	return zones, nil
 }

@@ -31,3 +31,19 @@ func CreateZone(c *gin.Context) {
 	}
 	response.Success(c, zoneResponse)
 }
+
+// GET /zones
+func ListZones(c *gin.Context) {
+	tenantCode := c.GetString("tenant_code")
+	userId := c.GetUint("user_id")
+	if tenantCode == "" {
+		return
+	}
+	service := tenantProvider.GetTenantInfo(tenantCode)
+	zoneResponse, err := service.ZoneService.GetUserZones(userId)
+	if err != nil {
+		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
+		return
+	}
+	response.Success(c, zoneResponse)
+}

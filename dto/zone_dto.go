@@ -14,12 +14,13 @@ type ZoneDTORequest struct {
 }
 
 type ZoneDTOResponse struct {
-	ID        uint           `json:"id"`
-	Name      string         `json:"name"`
-	Type      string         `json:"type"`
-	Path      string         `json:"path"`
-	Level     int            `json:"level"`
-	Metadata  datatypes.JSON `Gorm:"type:json"`
-	CreatedAt time.Time      `Gorm:"type:datetime"`
-	UpdatedAt time.Time      `Gorm:"type:datetime"`
+	ID        uint               `json:"id"`
+	Name      string             `json:"name"`
+	Type      string             `json:"type"`
+	Path      string             `json:"path"`
+	Level     int                `json:"level"`
+	Metadata  datatypes.JSON     `Gorm:"type:json"`
+	CreatedAt time.Time          `Gorm:"type:datetime"`
+	UpdatedAt time.Time          `Gorm:"type:datetime"`
+	Children  []*ZoneDTOResponse `json:"children"`
 }

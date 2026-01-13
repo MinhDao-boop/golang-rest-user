@@ -31,5 +31,6 @@ func AuthRoutes(r *gin.RouterGroup) {
 }
 
 func ZonesRoutes(r *gin.RouterGroup) {
+	r.GET("", tenant.ListZones)   // GET /api/v1/zones
 	r.POST("", tenant.CreateZone) // POST /api/v1/zones
 }

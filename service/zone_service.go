@@ -6,13 +6,14 @@ import (
 	"golang-rest-user/enums"
 	"golang-rest-user/models"
 	"golang-rest-user/repository"
+	"strings"
 	"time"
 )
 
 type ZoneService interface {
 	CreateZone(request *dto.ZoneDTORequest, userID uint) (*dto.ZoneDTOResponse, error)
 	UpdateZone(request *dto.ZoneDTORequest) (*dto.ZoneDTOResponse, error)
-	GetUserZones(userID uint) ([]dto.ZoneDTOResponse, error)
+	GetUserZones(userID uint) (*dto.ZoneDTOResponse, error)
 }
 
 type zoneServiceImpl struct {
@@ -34,19 +35,28 @@ func convertToZoneDTOResponse(zone *models.Zone) *dto.ZoneDTOResponse {
 		Metadata:  zone.Metadata,
 		CreatedAt: zone.CreatedAt,
 		UpdatedAt: zone.UpdatedAt,
+		Children:  make([]*dto.ZoneDTOResponse, 0),
 	}
 }
 
 func (s *zoneServiceImpl) CreateZone(request *dto.ZoneDTORequest, userID uint) (*dto.ZoneDTOResponse, error) {
 	var parentPath string
 	var parentLevel int
+	if _, err := s.zoneRepo.GetByName(request.Name); err == nil {
+		return nil, fmt.Errorf("zone with name %s already exists", request.Name)
+	}
 	if request.ParentID != 0 {
-		parent, err := s.zoneRepo.GetByID(request.ParentID)
+
+		parentZone, err := s.zoneRepo.GetByID(request.ParentID)
 		if err != nil {
 			return nil, err
 		}
-		parentPath = parent.Path
-		parentLevel = parent.Level
+		permission, _ := s.userZoneRepo.GetPermission(userID, parentZone.Path)
+		if strings.Compare(permission, "owner") != 0 {
+			return nil, fmt.Errorf("user is not an owner")
+		}
+		parentPath = parentZone.Path
+		parentLevel = parentZone.Level
 	}
 	newZone := models.Zone{
 		Name:     request.Name,
@@ -74,7 +84,7 @@ func (s *zoneServiceImpl) CreateZone(request *dto.ZoneDTORequest, userID uint) (
 			Permission: enums.PermOwner,
 		}
 		newUserZone.CreatedAt = time.Now()
-		if err := s.userZoneRepo.AddUserPermission(newUserZone); err != nil {
+		if err := s.userZoneRepo.Create(newUserZone); err != nil {
 			return nil, err
 		}
 	}
@@ -83,45 +93,35 @@ func (s *zoneServiceImpl) CreateZone(request *dto.ZoneDTORequest, userID uint) (
 func (s *zoneServiceImpl) UpdateZone(request *dto.ZoneDTORequest) (*dto.ZoneDTOResponse, error) {
 	return nil, nil
 }
-func (s *zoneServiceImpl) GetUserZones(userID uint) ([]dto.ZoneDTOResponse, error) {
-	userZones, err := s.userZoneRepo.GetUserZones(userID)
+func (s *zoneServiceImpl) GetUserZones(userID uint) (*dto.ZoneDTOResponse, error) {
+	zoneID, err := s.userZoneRepo.GetZoneID(userID)
+	zone, _ := s.zoneRepo.GetByID(zoneID)
+	subZones, err := s.zoneRepo.GetSubtreeByPath(zone.Path)
 	if err != nil {
 		return nil, err
 	}
-	if len(userZones) == 0 {
-		return []dto.ZoneDTOResponse{}, nil
-	}
-	var paths []string
-	for _, u := range userZones {
-		z, _ := s.zoneRepo.GetByID(u.ZoneID)
-		paths = append(paths, z.Path)
-	}
-
-	zones, _ := s.zoneRepo.GetByPaths(paths)
-	var zoneResponses []dto.ZoneDTOResponse
-	for _, z := range zones {
-		zoneRes := convertToZoneDTOResponse(&z)
-		zoneResponses = append(zoneResponses, *zoneRes)
-	}
+	zoneResponses := buildTree(subZones, zoneID)
 	return zoneResponses, nil
 }
 
-//func buildTree(nodes []models.Zone) []models.Zone {
-//	nodeMap := make(map[uint]*models.Zone)
-//	var rootNodes []models.Zone
-//
-//	for i := range nodes {
-//		nodeMap[nodes[i].ID] = &nodes[i]
-//	}
-//
-//	for i := range nodes {
-//		node := &nodes[i]
-//		if node.ParentID != nil && nodeMap[*node.ParentID] != nil {
-//			parent := nodeMap[*node.ParentID]
-//			parent.Children = append(parent.Children, *node)
-//		} else {
-//			rootNodes = append(rootNodes, *node)
-//		}
-//	}
-//	return rootNodes
-//}
+func buildTree(zones []models.Zone, zoneID uint) *dto.ZoneDTOResponse {
+	nodeMap := make(map[uint]*dto.ZoneDTOResponse)
+	//var roots []dto.ZoneDTOResponse
+
+	for _, z := range zones {
+		nodeMap[z.ID] = convertToZoneDTOResponse(&z)
+	}
+
+	for _, z := range zones {
+		node := nodeMap[z.ID]
+
+		if parent, ok := nodeMap[*z.ParentID]; ok {
+			parent.Children = append(parent.Children, node)
+			continue
+		}
+
+		//roots = append(roots, *node)
+	}
+
+	return nodeMap[zoneID]
+}

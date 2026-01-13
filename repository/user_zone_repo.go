@@ -7,19 +7,41 @@ import (
 )
 
 type UserZoneRepo interface {
-	AddUserPermission(*models.UserZone) error
-	GetUserZones(userID uint) ([]models.UserZone, error)
+	Create(*models.UserZone) error
+	GetPermission(userID uint, path string) (string, error)
+	GetZoneID(userID uint) (uint, error)
 }
 
 type userZoneRepoImpl struct {
 	db *gorm.DB
 }
 
+func (r *userZoneRepoImpl) GetZoneID(userID uint) (uint, error) {
+	var userZone models.UserZone
+	err := r.db.Table("user_zones").Where("user_id = ?", userID).First(&userZone).Error
+
+	return userZone.ZoneID, err
+}
+
+func (r *userZoneRepoImpl) GetPermission(userID uint, path string) (string, error) {
+	var permission string
+	err := r.db.Table("user_zones uz").
+		Select("uz.permission").
+		Joins("JOIN zones z on uz.zone_id = z.id").
+		Where("uz.user_id = ? AND ? LIKE CONCAT(z.path, '%')", userID, path).
+		Order("z.level DESC").
+		Limit(1).Scan(&permission).Error
+	if err != nil {
+		return "", err
+	}
+	return permission, nil
+}
+
 func NewUserZoneRepo(db *gorm.DB) UserZoneRepo {
 	return &userZoneRepoImpl{db: db}
 }
 
-func (r *userZoneRepoImpl) AddUserPermission(userZone *models.UserZone) error {
+func (r *userZoneRepoImpl) Create(userZone *models.UserZone) error {
 	return r.db.Create(userZone).Error
 }
 
