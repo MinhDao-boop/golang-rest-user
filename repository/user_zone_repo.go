@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"golang-rest-user/enums"
 	"golang-rest-user/models"
 
 	"gorm.io/gorm"
@@ -8,15 +9,24 @@ import (
 
 type UserZoneRepo interface {
 	Create(*models.UserZone) error
-	Update(*models.UserZone) error
+	UpdatePermission(userID, zoneID uint, permission enums.UserPermission) error
 	Delete(userID, zoneID uint) (int64, error)
 	GetPermission(userID uint, path string) (string, error)
 	GetZoneID(userID uint) (uint, error)
 	GetSharedUser(uint) ([]models.UserZone, error)
+	GetSharedZone(uint) ([]models.UserZone, error)
 }
 
 type userZoneRepoImpl struct {
 	db *gorm.DB
+}
+
+func (r *userZoneRepoImpl) GetSharedZone(userID uint) (userZones []models.UserZone, err error) {
+	if err = r.db.Where("user_id = ?", userID).
+		Find(&userZones).Error; err != nil {
+		return nil, err
+	}
+	return userZones, nil
 }
 
 func (r *userZoneRepoImpl) GetZoneID(userID uint) (uint, error) {
@@ -41,7 +51,7 @@ func (r *userZoneRepoImpl) GetPermission(userID uint, path string) (string, erro
 }
 
 func (r *userZoneRepoImpl) GetSharedUser(zoneID uint) (userZones []models.UserZone, err error) {
-	if err := r.db.Where("zone_id = ?", zoneID).
+	if err = r.db.Where("zone_id = ?", zoneID).
 		Find(&userZones).Error; err != nil {
 		return nil, err
 	}
@@ -52,8 +62,9 @@ func (r *userZoneRepoImpl) Create(userZone *models.UserZone) error {
 	return r.db.Create(userZone).Error
 }
 
-func (r *userZoneRepoImpl) Update(userZone *models.UserZone) error {
-	return r.db.Save(userZone).Error
+func (r *userZoneRepoImpl) UpdatePermission(userID, zoneID uint, permission enums.UserPermission) error {
+	return r.db.Model(&models.UserZone{}).Where("user_id = ? AND zone_id = ?", userID, zoneID).
+		Update("permission", permission).Error
 }
 
 func (r *userZoneRepoImpl) Delete(userID, zoneID uint) (int64, error) {

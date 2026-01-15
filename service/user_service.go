@@ -30,7 +30,7 @@ func NewUserService(tenantCode string, r repository.UserRepo) UserService {
 	return &userService{repo: r, tenantCode: tenantCode}
 }
 
-func ConvertToUserResponse(user *models.User) *dto.UserResponse {
+func convertToUserResponse(user *models.User) *dto.UserResponse {
 	return &dto.UserResponse{
 		ID:        user.ID,
 		UUID:      user.UUID,
@@ -67,7 +67,7 @@ func (s *userService) Create(req dto.CreateUserRequest) (*dto.UserResponse, erro
 	if err := s.repo.Create(user); err != nil {
 		return nil, err
 	}
-	return ConvertToUserResponse(user), nil
+	return convertToUserResponse(user), nil
 }
 
 func (s *userService) GetByUUID(uuid string) (*dto.UserResponse, error) {
@@ -75,7 +75,7 @@ func (s *userService) GetByUUID(uuid string) (*dto.UserResponse, error) {
 	if err != nil {
 		return nil, err
 	}
-	return ConvertToUserResponse(user), nil
+	return convertToUserResponse(user), nil
 }
 
 func (s *userService) List(page, pageSize int, search string) ([]dto.UserResponse, int64, error) {
@@ -86,7 +86,7 @@ func (s *userService) List(page, pageSize int, search string) ([]dto.UserRespons
 	}
 	var result []dto.UserResponse
 	for _, u := range users {
-		result = append(result, *ConvertToUserResponse(&u))
+		result = append(result, *convertToUserResponse(&u))
 	}
 	return result, total, nil
 }
@@ -104,7 +104,7 @@ func (s *userService) Update(uuid string, req dto.UpdateUserRequest) (*dto.UserR
 	if err := s.repo.Update(user); err != nil {
 		return nil, err
 	}
-	return ConvertToUserResponse(user), nil
+	return convertToUserResponse(user), nil
 }
 
 func (s *userService) DeleteMany(uuids []string) (int64, error) {

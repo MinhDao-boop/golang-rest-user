@@ -16,6 +16,7 @@ type ZoneService interface {
 	UpdateZone(request *dto.ZoneDTORequest, uuid string) (*dto.ZoneDTOResponse, error)
 	GetUserZones(userID uint) ([]dto.ZoneDTOResponse, error)
 	DeleteZones(uuid string) (int64, error)
+	GetSharedZone(userID uint) ([]dto.ZoneDTOResponse, error)
 }
 
 type zoneServiceImpl struct {
@@ -29,25 +30,6 @@ func (s *zoneServiceImpl) DeleteZones(uuid string) (int64, error) {
 		return 0, err
 	}
 	return s.zoneRepo.DeleteByPath(zone.Path)
-}
-
-func NewZoneService(zoneRepo repository.ZoneRepo, userZoneRepo repository.UserZoneRepo) ZoneService {
-	return &zoneServiceImpl{zoneRepo: zoneRepo, userZoneRepo: userZoneRepo}
-}
-
-func convertToZoneDTOResponse(zone *models.Zone) *dto.ZoneDTOResponse {
-	return &dto.ZoneDTOResponse{
-		ID:        zone.ID,
-		UUID:      zone.UUID,
-		Name:      zone.Name,
-		Type:      zone.Type,
-		Path:      zone.Path,
-		Level:     zone.Level,
-		Metadata:  zone.Metadata,
-		CreatedAt: zone.CreatedAt,
-		UpdatedAt: zone.UpdatedAt,
-		ParentID:  zone.ParentID,
-	}
 }
 
 func (s *zoneServiceImpl) CreateZone(request *dto.ZoneDTORequest, userID uint) (*dto.ZoneDTOResponse, error) {
@@ -131,4 +113,36 @@ func (s *zoneServiceImpl) GetUserZones(userID uint) ([]dto.ZoneDTOResponse, erro
 		zoneResponses = append(zoneResponses, *convertToZoneDTOResponse(&z))
 	}
 	return zoneResponses, nil
+}
+
+func (s *zoneServiceImpl) GetSharedZone(userID uint) ([]dto.ZoneDTOResponse, error) {
+	var zoneResponses []dto.ZoneDTOResponse
+	userZones, err := s.userZoneRepo.GetSharedZone(userID)
+	if err != nil {
+		return nil, err
+	}
+	for _, uz := range userZones {
+		zone, _ := s.zoneRepo.GetByID(uz.ZoneID)
+		zoneResponses = append(zoneResponses, *convertToZoneDTOResponse(zone))
+	}
+	return zoneResponses, nil
+}
+
+func NewZoneService(zoneRepo repository.ZoneRepo, userZoneRepo repository.UserZoneRepo) ZoneService {
+	return &zoneServiceImpl{zoneRepo: zoneRepo, userZoneRepo: userZoneRepo}
+}
+
+func convertToZoneDTOResponse(zone *models.Zone) *dto.ZoneDTOResponse {
+	return &dto.ZoneDTOResponse{
+		ID:        zone.ID,
+		UUID:      zone.UUID,
+		Name:      zone.Name,
+		Type:      zone.Type,
+		Path:      zone.Path,
+		Level:     zone.Level,
+		Metadata:  zone.Metadata,
+		CreatedAt: zone.CreatedAt,
+		UpdatedAt: zone.UpdatedAt,
+		ParentID:  zone.ParentID,
+	}
 }

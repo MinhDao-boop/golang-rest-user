@@ -48,6 +48,22 @@ func ListZones(c *gin.Context) {
 	response.Success(c, zoneResponse)
 }
 
+// GET /zones/share-with-me
+func ListSharedZones(c *gin.Context) {
+	tenantCode := c.GetString("tenant_code")
+	if tenantCode == "" {
+		return
+	}
+	userID := c.GetUint("user_id")
+	service := tenantProvider.GetTenantInfo(tenantCode)
+	zoneResponses, err := service.ZoneService.GetSharedZone(userID)
+	if err != nil {
+		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusInternalServerError)
+		return
+	}
+	response.Success(c, zoneResponses)
+}
+
 // PUT /zone/:uuid
 func UpdateZone(c *gin.Context) {
 	tenantCode := c.GetString("tenant_code")

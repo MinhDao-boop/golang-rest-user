@@ -57,7 +57,7 @@ func (s *authService) Register(req dto.CreateUserRequest) (*dto.UserResponse, er
 		return nil, err
 	}
 
-	return ConvertToUserResponse(user), nil
+	return convertToUserResponse(user), nil
 }
 
 func (s *authService) Login(tenantCode string, req dto.LoginRequest) (map[string]interface{}, error) {

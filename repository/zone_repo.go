@@ -12,7 +12,6 @@ type ZoneRepo interface {
 	DeleteByPath(string) (deleted int64, err error)
 	GetByID(uint) (*models.Zone, error)
 	GetByUUID(string) (*models.Zone, error)
-	GetByName(string) (*models.Zone, error)
 	UpdateZonePath(uint, string) error
 	GetSubtreeByPath(path string) ([]models.Zone, error)
 }
