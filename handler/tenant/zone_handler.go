@@ -47,3 +47,40 @@ func ListZones(c *gin.Context) {
 	}
 	response.Success(c, zoneResponse)
 }
+
+// PUT /zone/:uuid
+func UpdateZone(c *gin.Context) {
+	tenantCode := c.GetString("tenant_code")
+	uuid := c.Param("uuid")
+	if tenantCode == "" {
+		return
+	}
+	service := tenantProvider.GetTenantInfo(tenantCode)
+	var req = dto.ZoneDTORequest{}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
+		return
+	}
+	zoneResponse, err := service.ZoneService.UpdateZone(&req, uuid)
+	if err != nil {
+		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
+		return
+	}
+	response.Success(c, zoneResponse)
+}
+
+// DELETE /zones/:uuid
+func DeleteZone(c *gin.Context) {
+	tenantCode := c.GetString("tenant_code")
+	uuid := c.Param("uuid")
+	if tenantCode == "" {
+		return
+	}
+	service := tenantProvider.GetTenantInfo(tenantCode)
+	deleted, err := service.ZoneService.DeleteZones(uuid)
+	if err != nil {
+		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
+		return
+	}
+	response.Success(c, gin.H{"zone deleted": deleted})
+}

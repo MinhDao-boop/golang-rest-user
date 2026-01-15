@@ -14,11 +14,12 @@ import (
 )
 
 type TenantInfo struct {
-	Info        *models.Tenant
-	db          *gorm.DB
-	UserService service.UserService
-	AuthService service.AuthService
-	ZoneService service.ZoneService
+	Info         *models.Tenant
+	db           *gorm.DB
+	UserService  service.UserService
+	AuthService  service.AuthService
+	ZoneService  service.ZoneService
+	ShareService service.ShareService
 }
 
 func (t *TenantInfo) Init() error {
@@ -57,6 +58,7 @@ func (t *TenantInfo) InitService() {
 	zoneRepo := repository.NewZoneRepo(t.db)
 	userZoneRepo := repository.NewUserZoneRepo(t.db)
 	t.ZoneService = service.NewZoneService(zoneRepo, userZoneRepo)
+	t.ShareService = service.NewShareService(userZoneRepo, zoneRepo, userRepo)
 }
 
 func (t *TenantInfo) Migrate() {

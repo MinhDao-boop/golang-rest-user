@@ -9,8 +9,9 @@ import (
 type ZoneRepo interface {
 	Create(*models.Zone) error
 	Update(*models.Zone) error
-	DeleteByIDs([]uint) (deleted int64, err error)
+	DeleteByPath(string) (deleted int64, err error)
 	GetByID(uint) (*models.Zone, error)
+	GetByUUID(string) (*models.Zone, error)
 	GetByName(string) (*models.Zone, error)
 	UpdateZonePath(uint, string) error
 	GetSubtreeByPath(path string) ([]models.Zone, error)
@@ -18,6 +19,14 @@ type ZoneRepo interface {
 
 type zoneRepoImpl struct {
 	db *gorm.DB
+}
+
+func (r *zoneRepoImpl) GetByUUID(uuid string) (*models.Zone, error) {
+	var zone models.Zone
+	if err := r.db.Model(&models.Zone{}).Where("uuid = ?", uuid).First(&zone).Error; err != nil {
+		return nil, err
+	}
+	return &zone, nil
 }
 
 func (r *zoneRepoImpl) GetSubtreeByPath(path string) ([]models.Zone, error) {
@@ -33,16 +42,17 @@ func NewZoneRepo(db *gorm.DB) ZoneRepo {
 	return &zoneRepoImpl{db: db}
 }
 
-func (r *zoneRepoImpl) Create(user *models.Zone) error {
-	return r.db.Create(user).Error
+func (r *zoneRepoImpl) Create(zone *models.Zone) error {
+	return r.db.Create(zone).Error
 }
 
-func (r *zoneRepoImpl) Update(user *models.Zone) error {
-	return r.db.Save(user).Error
+func (r *zoneRepoImpl) Update(zone *models.Zone) error {
+	return r.db.Save(zone).Error
 }
 
-func (r *zoneRepoImpl) DeleteByIDs(ids []uint) (deleted int64, err error) {
-	return 0, nil
+func (r *zoneRepoImpl) DeleteByPath(path string) (deleted int64, err error) {
+	res := r.db.Where("path LIKE ?", path+"%").Delete(&models.Zone{})
+	return res.RowsAffected, res.Error
 }
 
 func (r *zoneRepoImpl) GetByID(id uint) (*models.Zone, error) {

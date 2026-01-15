@@ -47,11 +47,11 @@ func (s *authService) Register(req dto.CreateUserRequest) (*dto.UserResponse, er
 	}
 
 	user := &models.User{
-		UUID:     uuid.NewString(),
 		Username: req.Username,
 		Password: encryptedPass,
 		FullName: req.FullName,
 	}
+	user.UUID = uuid.New().String()
 
 	if err := s.userRepo.Create(user); err != nil {
 		return nil, err

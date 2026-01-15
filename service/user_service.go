@@ -55,13 +55,13 @@ func (s *userService) Create(req dto.CreateUserRequest) (*dto.UserResponse, erro
 	}
 
 	user := &models.User{
-		UUID:     uuid.New().String(),
 		Username: req.Username,
 		Password: passEncrypted,
 		FullName: req.FullName,
 		Phone:    req.Phone,
 		Position: req.Position,
 	}
+	user.UUID = uuid.New().String()
 	user.CreatedAt = time.Now()
 
 	if err := s.repo.Create(user); err != nil {

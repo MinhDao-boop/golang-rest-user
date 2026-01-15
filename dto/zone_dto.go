@@ -10,17 +10,18 @@ type ZoneDTORequest struct {
 	Name     string         `json:"name"`
 	Type     string         `json:"type"`
 	Metadata datatypes.JSON `Gorm:"type:json"`
-	ParentID uint           `json:"parent_id"`
+	ParentID *uint          `json:"parent_id"`
 }
 
 type ZoneDTOResponse struct {
-	ID        uint               `json:"id"`
-	Name      string             `json:"name"`
-	Type      string             `json:"type"`
-	Path      string             `json:"path"`
-	Level     int                `json:"level"`
-	Metadata  datatypes.JSON     `Gorm:"type:json"`
-	CreatedAt time.Time          `Gorm:"type:datetime"`
-	UpdatedAt time.Time          `Gorm:"type:datetime"`
-	Children  []*ZoneDTOResponse `json:"children"`
+	ID        uint           `json:"id"`
+	UUID      string         `json:"uuid"`
+	Name      string         `json:"name"`
+	Type      string         `json:"type"`
+	Path      string         `json:"path"`
+	Level     int            `json:"level"`
+	Metadata  datatypes.JSON `Gorm:"type:json"`
+	CreatedAt time.Time      `Gorm:"type:datetime"`
+	UpdatedAt time.Time      `Gorm:"type:datetime"`
+	ParentID  *uint          `json:"parent_id"`
 }

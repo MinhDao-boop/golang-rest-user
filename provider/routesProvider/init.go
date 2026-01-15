@@ -31,4 +31,8 @@ func Init(router *gin.Engine) {
 	zones := v1.Group("/zones")
 	zones.Use(middleware.AuthMiddleware(jwtManager))
 	routes.ZonesRoutes(zones)
+
+	share := v1.Group("/zones/:uuid/share")
+	share.Use(middleware.AuthMiddleware(jwtManager))
+	routes.ShareRoutes(share)
 }

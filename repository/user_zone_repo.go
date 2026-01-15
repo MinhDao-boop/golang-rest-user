@@ -8,8 +8,11 @@ import (
 
 type UserZoneRepo interface {
 	Create(*models.UserZone) error
+	Update(*models.UserZone) error
+	Delete(userID, zoneID uint) (int64, error)
 	GetPermission(userID uint, path string) (string, error)
 	GetZoneID(userID uint) (uint, error)
+	GetSharedUser(uint) ([]models.UserZone, error)
 }
 
 type userZoneRepoImpl struct {
@@ -37,18 +40,27 @@ func (r *userZoneRepoImpl) GetPermission(userID uint, path string) (string, erro
 	return permission, nil
 }
 
-func NewUserZoneRepo(db *gorm.DB) UserZoneRepo {
-	return &userZoneRepoImpl{db: db}
+func (r *userZoneRepoImpl) GetSharedUser(zoneID uint) (userZones []models.UserZone, err error) {
+	if err := r.db.Where("zone_id = ?", zoneID).
+		Find(&userZones).Error; err != nil {
+		return nil, err
+	}
+	return userZones, nil
 }
 
 func (r *userZoneRepoImpl) Create(userZone *models.UserZone) error {
 	return r.db.Create(userZone).Error
 }
 
-func (r *userZoneRepoImpl) GetUserZones(userID uint) (userZones []models.UserZone, err error) {
-	if err := r.db.Where("user_id = ?", userID).
-		Find(&userZones).Error; err != nil {
-		return nil, err
-	}
-	return userZones, nil
+func (r *userZoneRepoImpl) Update(userZone *models.UserZone) error {
+	return r.db.Save(userZone).Error
+}
+
+func (r *userZoneRepoImpl) Delete(userID, zoneID uint) (int64, error) {
+	res := r.db.Unscoped().Where("user_id = ? AND zone_id = ?", userID, zoneID).Delete(&models.UserZone{})
+	return res.RowsAffected, res.Error
+}
+
+func NewUserZoneRepo(db *gorm.DB) UserZoneRepo {
+	return &userZoneRepoImpl{db: db}
 }
