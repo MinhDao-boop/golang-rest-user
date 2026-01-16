@@ -22,7 +22,7 @@ type userZoneRepoImpl struct {
 }
 
 func (r *userZoneRepoImpl) GetSharedZone(userID uint) (userZones []models.UserZone, err error) {
-	if err = r.db.Where("user_id = ?", userID).
+	if err = r.db.Where("user_id = ? AND permission NOT LIKE 'owner'", userID).
 		Find(&userZones).Error; err != nil {
 		return nil, err
 	}
