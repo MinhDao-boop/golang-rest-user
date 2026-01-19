@@ -65,7 +65,7 @@ func CreateUser(c *gin.Context) {
 	response.Success(c, userResponse)
 }
 
-// GET /users/:uuid
+// GET /users/:user_uuid
 func GetByUserUUID(c *gin.Context) {
 	tenantCode := c.GetString("tenant_code")
 	if tenantCode == "" {
@@ -73,7 +73,7 @@ func GetByUserUUID(c *gin.Context) {
 	}
 	service := tenantProvider.GetTenantInfo(tenantCode)
 
-	uuid := c.Param("uuid")
+	uuid := c.Param("user_uuid")
 	userResponse, err := service.UserService.GetByUUID(uuid)
 	if err != nil {
 		response.Error(c, response.CodeBadRequest, "user not found", nil, http.StatusBadRequest)
@@ -82,14 +82,14 @@ func GetByUserUUID(c *gin.Context) {
 	response.Success(c, userResponse)
 }
 
-// PUT /users/:uuid
+// PUT /users/:user_uuid
 func UpdateUser(c *gin.Context) {
 	tenantCode := c.GetString("tenant_code")
 	if tenantCode == "" {
 		return
 	}
 	service := tenantProvider.GetTenantInfo(tenantCode)
-	uuid := c.Param("uuid")
+	uuid := c.Param("user_uuid")
 
 	var req dto.UpdateUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -105,27 +105,19 @@ func UpdateUser(c *gin.Context) {
 	response.Success(c, userResponse)
 }
 
-// DELETE /users?uuids=1b0f0fe4-8710-4518-b8bc-7f1e52b280e4,1c8edc4f-b1a0-4252-808b-682eb76551ad,...
+// DELETE /users
 func DeleteManyUsers(c *gin.Context) {
 	tenantCode := c.GetString("tenant_code")
 	if tenantCode == "" {
 		return
 	}
 	service := tenantProvider.GetTenantInfo(tenantCode)
-	uuidsParam := c.Query("uuids")
-	if uuidsParam == "" {
-		response.Error(c, response.CodeBadRequest, "ids query param required", nil, http.StatusBadRequest)
+	var req dto.DeleteUserRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
 		return
 	}
-	parts := strings.Split(uuidsParam, ",")
-	uuids := []string{}
-	for _, p := range parts {
-		if p == "" {
-			continue
-		}
-		uuids = append(uuids, strings.TrimSpace(p))
-	}
-	deleted, err := service.UserService.DeleteMany(uuids)
+	deleted, err := service.UserService.DeleteMany(req)
 	if err != nil {
 		response.Error(c, response.CodeBadRequest, err.Error(), gin.H{"deleted": deleted}, http.StatusBadRequest)
 		return

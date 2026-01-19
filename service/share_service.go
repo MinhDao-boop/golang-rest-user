@@ -13,7 +13,7 @@ import (
 )
 
 type ShareService interface {
-	ShareZone(userID uint, zoneUUID string, req dto.ShareDTORequest) (*dto.ShareDTOResponse, error)
+	ShareZone(shareUserID uint, req dto.ShareDTORequest) (*dto.ShareDTOResponse, error)
 	RevokeUser(zoneUUID, userUUID string, userID uint) (int64, error)
 	UpdatePermission(zoneUUID, userUUID string, userID uint, req dto.ShareDTORequest) error
 	GetSharedUser(zoneUUID string, userID uint) ([]dto.UserResponse, error)
@@ -21,23 +21,23 @@ type ShareService interface {
 
 type shareServiceImpl struct {
 	userZoneRepo repository.UserZoneRepo
-	zoneRepo     repository.ZoneRepo
-	userRepo     repository.UserRepo
+	zoneService  ZoneService
+	userService  UserService
 }
 
 func (s *shareServiceImpl) GetSharedUser(zoneUUID string, userID uint) ([]dto.UserResponse, error) {
-	var userResponse []dto.UserResponse
 	zone, err := s.checkOwnerPermission(zoneUUID, userID)
 	if err != nil {
 		return nil, err
 	}
+	var userResponse []dto.UserResponse
 	userZones, err := s.userZoneRepo.GetSharedUser(zone.ID)
 	if err != nil {
 		return nil, err
 	}
 	for _, uz := range userZones {
-		user, _ := s.userRepo.GetByID(uz.UserID)
-		userResponse = append(userResponse, *convertToUserResponse(user))
+		user, _ := s.userService.GetByID(uz.UserID)
+		userResponse = append(userResponse, *user)
 	}
 	return userResponse, nil
 }
@@ -47,26 +47,30 @@ func (s *shareServiceImpl) UpdatePermission(zoneUUID, userUUID string, userID ui
 	if err != nil {
 		return err
 	}
-	user, _ := s.userRepo.GetByUUID(userUUID)
-	if !enums.IsValidUserPermission(string(req.Permission)) {
+	user, _ := s.userService.GetByUUID(userUUID)
+	if !enums.IsValidUserPermission(req.Permission) {
 		return errors.New("invalid permission")
 	}
 	return s.userZoneRepo.UpdatePermission(user.ID, zone.ID, req.Permission)
 }
 
-func (s *shareServiceImpl) ShareZone(userID uint, zoneUUID string, req dto.ShareDTORequest) (*dto.ShareDTOResponse, error) {
-	zone, err := s.checkOwnerPermission(zoneUUID, userID)
+func (s *shareServiceImpl) ShareZone(shareUserID uint, req dto.ShareDTORequest) (*dto.ShareDTOResponse, error) {
+	if !enums.IsValidUserPermission(req.Permission) {
+		return nil, errors.New("invalid permission")
+	}
+	zone, err := s.checkOwnerPermission(req.ZoneUUID, shareUserID)
 	if err != nil {
 		return nil, err
 	}
-	if userID == req.UserID {
-		return nil, errors.New("sharing denied")
+	sharedUser, err := s.userService.GetByUUID(req.UserUUID)
+	if err != nil {
+		return nil, err
 	}
-	if !enums.IsValidUserPermission(string(req.Permission)) {
-		return nil, errors.New("invalid permission")
+	if shareUserID == sharedUser.ID {
+		return nil, errors.New("invalid sharing")
 	}
 	userZone := models.UserZone{
-		UserID:     req.UserID,
+		UserID:     sharedUser.ID,
 		ZoneID:     zone.ID,
 		Permission: req.Permission,
 	}
@@ -75,28 +79,31 @@ func (s *shareServiceImpl) ShareZone(userID uint, zoneUUID string, req dto.Share
 	if err := s.userZoneRepo.Create(&userZone); err != nil {
 		return nil, err
 	}
-	return convertToShareDTOResponse(&userZone), nil
+	return s.convertToShareDTOResponse(&userZone), nil
 }
 
-func (s *shareServiceImpl) RevokeUser(zoneUUID, userUUID string, userID uint) (int64, error) {
-	user, _ := s.userRepo.GetByUUID(userUUID)
-	zone, err := s.checkOwnerPermission(zoneUUID, userID)
+func (s *shareServiceImpl) RevokeUser(zoneUUID, userUUID string, shareUserID uint) (int64, error) {
+	zone, err := s.checkOwnerPermission(zoneUUID, shareUserID)
+	user, _ := s.userService.GetByUUID(userUUID)
 	if err != nil {
 		return 0, err
 	}
 	return s.userZoneRepo.Delete(user.ID, zone.ID)
 }
 
-func (s *shareServiceImpl) checkOwnerPermission(zoneUUID string, userID uint) (*models.Zone, error) {
-	zone, _ := s.zoneRepo.GetByUUID(zoneUUID)
-	curPermission, err := s.userZoneRepo.GetPermission(userID, zone.Path)
+func (s *shareServiceImpl) checkOwnerPermission(zoneUUID string, shareUserID uint) (*dto.ZoneDTOResponse, error) {
+	zone, err := s.zoneService.GetByUUID(zoneUUID)
+	if err != nil {
+		return nil, err
+	}
+	curPermission, err := s.userZoneRepo.GetPermission(shareUserID, zone.Path)
 	if err != nil || strings.Compare(curPermission, string(enums.UserOwner)) != 0 {
 		return nil, errors.New("permission denied")
 	}
 	return zone, nil
 }
 
-func convertToShareDTOResponse(userZone *models.UserZone) *dto.ShareDTOResponse {
+func (s *shareServiceImpl) convertToShareDTOResponse(userZone *models.UserZone) *dto.ShareDTOResponse {
 	return &dto.ShareDTOResponse{
 		UUID:       userZone.UUID,
 		UserID:     userZone.UserID,
@@ -107,14 +114,6 @@ func convertToShareDTOResponse(userZone *models.UserZone) *dto.ShareDTOResponse 
 	}
 }
 
-func NewShareService(
-	userZoneRepo repository.UserZoneRepo,
-	zoneRepo repository.ZoneRepo,
-	userRepo repository.UserRepo,
-) ShareService {
-	return &shareServiceImpl{
-		userZoneRepo: userZoneRepo,
-		zoneRepo:     zoneRepo,
-		userRepo:     userRepo,
-	}
+func NewShareService(userZoneRepo repository.UserZoneRepo) ShareService {
+	return &shareServiceImpl{userZoneRepo: userZoneRepo}
 }

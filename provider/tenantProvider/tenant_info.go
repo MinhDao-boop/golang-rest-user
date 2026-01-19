@@ -58,7 +58,7 @@ func (t *TenantInfo) InitService() {
 	zoneRepo := repository.NewZoneRepo(t.db)
 	userZoneRepo := repository.NewUserZoneRepo(t.db)
 	t.ZoneService = service.NewZoneService(zoneRepo, userZoneRepo)
-	t.ShareService = service.NewShareService(userZoneRepo, zoneRepo, userRepo)
+	t.ShareService = service.NewShareService(userZoneRepo)
 }
 
 func (t *TenantInfo) Migrate() {
@@ -67,6 +67,10 @@ func (t *TenantInfo) Migrate() {
 		&models.User{},
 		&models.Zone{},
 		&models.UserZone{},
+		&models.Device{},
+		&models.DeviceCredential{},
+		&models.DeviceEvents{},
+		&models.DeviceTelemetry{},
 	)
 	if err != nil {
 		log.Println(err)

@@ -11,7 +11,7 @@ type UserRepo interface {
 	GetByID(uint) (*models.User, error)
 	GetList(page, pageSize int, search string) (users []models.User, total int64, err error)
 	Update(*models.User) error
-	DeleteByIDs([]uint) (deleted int64, err error)
+	DeleteByUUIDs([]string) (deleted int64, err error)
 	GetByUsername(string) (*models.User, error)
 	GetByUUID(string) (*models.User, error)
 }
@@ -61,8 +61,8 @@ func (r *userRepo) Update(user *models.User) error {
 	return r.db.Save(user).Error
 }
 
-func (r *userRepo) DeleteByIDs(ids []uint) (int64, error) {
-	res := r.db.Delete(&models.User{}, ids)
+func (r *userRepo) DeleteByUUIDs(uuids []string) (int64, error) {
+	res := r.db.Delete(&models.User{}, uuids)
 	return res.RowsAffected, res.Error
 }
 

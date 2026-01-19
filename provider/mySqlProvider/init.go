@@ -6,9 +6,11 @@ import (
 	"golang-rest-user/models"
 	"log"
 	"os"
+	"time"
 
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 var instance *gorm.DB
@@ -22,8 +24,19 @@ func CreateInstanceDB(dbUser, dbPass, dbHost, dbPort, dbName string) (instance *
 		dbPort,
 		dbName,
 	)
-
-	if instance, err = gorm.Open(mysql.Open(dsn), &gorm.Config{}); err != nil {
+	logConf := logger.New(
+		log.New(os.Stdout, "\r", log.LstdFlags), // io writer
+		logger.Config{
+			SlowThreshold:             time.Second, // Slow SQL threshold
+			LogLevel:                  logger.Info, // Log level
+			IgnoreRecordNotFoundError: true,        // Ignore ErrRecordNotFound error for logger
+			Colorful:                  true,        // Disable color
+		},
+	)
+	if instance, err = gorm.Open(mysql.Open(dsn), &gorm.Config{
+		Logger:      logConf,
+		PrepareStmt: true,
+	}); err != nil {
 		log.Printf("Error connect db %s", dbName)
 		return nil, err
 	}

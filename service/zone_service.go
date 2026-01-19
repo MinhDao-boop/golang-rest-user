@@ -14,14 +14,22 @@ import (
 type ZoneService interface {
 	CreateZone(request *dto.ZoneDTORequest, userID uint) (*dto.ZoneDTOResponse, error)
 	UpdateZone(request *dto.ZoneDTORequest, uuid string) (*dto.ZoneDTOResponse, error)
-	GetUserZones(userID uint) ([]dto.ZoneDTOResponse, error)
+	GetZonesByUser(userID uint) ([]dto.ZoneDTOResponse, error)
 	DeleteZones(uuid string) (int64, error)
-	GetSharedZone(userID uint) ([]dto.ZoneDTOResponse, error)
+	GetByUUID(uuid string) (*dto.ZoneDTOResponse, error)
 }
 
 type zoneServiceImpl struct {
 	zoneRepo     repository.ZoneRepo
 	userZoneRepo repository.UserZoneRepo
+}
+
+func (s *zoneServiceImpl) GetByUUID(uuid string) (*dto.ZoneDTOResponse, error) {
+	zone, err := s.zoneRepo.GetByUUID(uuid)
+	if err != nil {
+		return nil, err
+	}
+	return s.convertToZoneDTOResponse(zone), nil
 }
 
 func (s *zoneServiceImpl) DeleteZones(uuid string) (int64, error) {
@@ -80,7 +88,7 @@ func (s *zoneServiceImpl) CreateZone(request *dto.ZoneDTORequest, userID uint) (
 			return nil, err
 		}
 	}
-	return convertToZoneDTOResponse(&newZone), nil
+	return s.convertToZoneDTOResponse(&newZone), nil
 }
 func (s *zoneServiceImpl) UpdateZone(request *dto.ZoneDTORequest, uuid string) (*dto.ZoneDTOResponse, error) {
 	zone, err := s.zoneRepo.GetByUUID(uuid)
@@ -99,9 +107,9 @@ func (s *zoneServiceImpl) UpdateZone(request *dto.ZoneDTORequest, uuid string) (
 	if err := s.zoneRepo.Update(zone); err != nil {
 		return nil, err
 	}
-	return convertToZoneDTOResponse(zone), nil
+	return s.convertToZoneDTOResponse(zone), nil
 }
-func (s *zoneServiceImpl) GetUserZones(userID uint) ([]dto.ZoneDTOResponse, error) {
+func (s *zoneServiceImpl) GetZonesByUser(userID uint) ([]dto.ZoneDTOResponse, error) {
 	zoneID, err := s.userZoneRepo.GetZoneID(userID)
 	zone, _ := s.zoneRepo.GetByID(zoneID)
 	subZones, err := s.zoneRepo.GetSubtreeByPath(zone.Path)
@@ -110,20 +118,7 @@ func (s *zoneServiceImpl) GetUserZones(userID uint) ([]dto.ZoneDTOResponse, erro
 	}
 	zoneResponses := make([]dto.ZoneDTOResponse, 0)
 	for _, z := range subZones {
-		zoneResponses = append(zoneResponses, *convertToZoneDTOResponse(&z))
-	}
-	return zoneResponses, nil
-}
-
-func (s *zoneServiceImpl) GetSharedZone(userID uint) ([]dto.ZoneDTOResponse, error) {
-	var zoneResponses []dto.ZoneDTOResponse
-	userZones, err := s.userZoneRepo.GetSharedZone(userID)
-	if err != nil {
-		return nil, err
-	}
-	for _, uz := range userZones {
-		zone, _ := s.zoneRepo.GetByID(uz.ZoneID)
-		zoneResponses = append(zoneResponses, *convertToZoneDTOResponse(zone))
+		zoneResponses = append(zoneResponses, *s.convertToZoneDTOResponse(&z))
 	}
 	return zoneResponses, nil
 }
@@ -132,7 +127,7 @@ func NewZoneService(zoneRepo repository.ZoneRepo, userZoneRepo repository.UserZo
 	return &zoneServiceImpl{zoneRepo: zoneRepo, userZoneRepo: userZoneRepo}
 }
 
-func convertToZoneDTOResponse(zone *models.Zone) *dto.ZoneDTOResponse {
+func (s *zoneServiceImpl) convertToZoneDTOResponse(zone *models.Zone) *dto.ZoneDTOResponse {
 	return &dto.ZoneDTOResponse{
 		ID:        zone.ID,
 		UUID:      zone.UUID,

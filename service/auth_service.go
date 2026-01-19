@@ -10,11 +10,8 @@ import (
 	"time"
 
 	"golang-rest-user/dto"
-	"golang-rest-user/models"
 	"golang-rest-user/repository"
 	"golang-rest-user/security"
-
-	"github.com/google/uuid"
 )
 
 type AuthService interface {
@@ -25,8 +22,9 @@ type AuthService interface {
 }
 
 type authService struct {
-	userRepo   repository.UserRepo
-	jwtManager *security.Manager
+	userRepo    repository.UserRepo
+	jwtManager  *security.Manager
+	userService UserService
 }
 
 func NewAuthService(userRepo repository.UserRepo, jwtManager *security.Manager) AuthService {
@@ -37,27 +35,7 @@ func NewAuthService(userRepo repository.UserRepo, jwtManager *security.Manager) 
 }
 
 func (s *authService) Register(req dto.CreateUserRequest) (*dto.UserResponse, error) {
-	if _, err := s.userRepo.GetByUsername(req.Username); err == nil {
-		return nil, errors.New("username already exists")
-	}
-
-	encryptedPass, err := utils.AESGCMEncrypt(req.Password)
-	if err != nil {
-		return nil, err
-	}
-
-	user := &models.User{
-		Username: req.Username,
-		Password: encryptedPass,
-		FullName: req.FullName,
-	}
-	user.UUID = uuid.New().String()
-
-	if err := s.userRepo.Create(user); err != nil {
-		return nil, err
-	}
-
-	return convertToUserResponse(user), nil
+	return s.userService.Create(req)
 }
 
 func (s *authService) Login(tenantCode string, req dto.LoginRequest) (map[string]interface{}, error) {

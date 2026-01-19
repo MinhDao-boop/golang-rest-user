@@ -8,13 +8,13 @@ const (
 	UserViewer UserPermission = "viewer"
 )
 
-func IsValidUserPermission(permission string) bool {
+func IsValidUserPermission(permission UserPermission) bool {
 	switch permission {
-	case "owner":
+	case UserOwner:
 		return true
-	case "editor":
+	case UserEditor:
 		return true
-	case "viewer":
+	case UserViewer:
 		return true
 	default:
 		return false

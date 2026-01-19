@@ -9,14 +9,14 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// GET /zones/:uuid/share
+// GET /zones/share/:zone_uuid
 func GetSharedUsers(c *gin.Context) {
 	tenantCode := c.GetString("tenant_code")
 	if tenantCode == "" {
 		return
 	}
 	userID := c.GetUint("user_id")
-	zoneUUID := c.Param("uuid")
+	zoneUUID := c.Param("zone_uuid")
 	service := tenantProvider.GetTenantInfo(tenantCode)
 	userResponse, err := service.ShareService.GetSharedUser(zoneUUID, userID)
 	if err != nil {
@@ -27,21 +27,20 @@ func GetSharedUsers(c *gin.Context) {
 
 }
 
-// POST /zones/:uuid/share
+// POST /zones/share
 func ShareZone(c *gin.Context) {
 	tenantCode := c.GetString("tenant_code")
 	if tenantCode == "" {
 		return
 	}
-	userID := c.GetUint("user_id")
-	zoneUUID := c.Param("uuid")
+	shareUserID := c.GetUint("user_id")
 	var req = dto.ShareDTORequest{}
 	if err := c.ShouldBind(&req); err != nil {
 		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
 		return
 	}
 	service := tenantProvider.GetTenantInfo(tenantCode)
-	shareResponse, err := service.ShareService.ShareZone(userID, zoneUUID, req)
+	shareResponse, err := service.ShareService.ShareZone(shareUserID, req)
 	if err != nil {
 		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
 		return
@@ -49,14 +48,14 @@ func ShareZone(c *gin.Context) {
 	response.Success(c, shareResponse)
 }
 
-// PUT /zones/:uuid/share/:user_uuid
+// PUT /zones/share/:zone_uuid/:user_uuid
 func UpdatePermission(c *gin.Context) {
 	tenantCode := c.GetString("tenant_code")
 	if tenantCode == "" {
 		return
 	}
 	userID := c.GetUint("user_id")
-	zoneUUID := c.Param("uuid")
+	zoneUUID := c.Param("zone_uuid")
 	userUUID := c.Param("user_uuid")
 	service := tenantProvider.GetTenantInfo(tenantCode)
 	var req = dto.ShareDTORequest{}
@@ -71,14 +70,14 @@ func UpdatePermission(c *gin.Context) {
 	response.Success(c, nil)
 }
 
-// DELETE /zones/:uuid/share/:user_uuid
+// DELETE /zones/share/:zone_uuid/:user_uuid
 func RevokeZone(c *gin.Context) {
 	tenantCode := c.GetString("tenant_code")
 	if tenantCode == "" {
 		return
 	}
 	userID := c.GetUint("user_id")
-	zoneUUID := c.Param("uuid")
+	zoneUUID := c.Param("zone_uuid")
 	userUUID := c.Param("user_uuid")
 	service := tenantProvider.GetTenantInfo(tenantCode)
 	total, err := service.ShareService.RevokeUser(zoneUUID, userUUID, userID)

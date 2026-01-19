@@ -12,8 +12,8 @@ type TenantRepo interface {
 	GetList(page, pageSize int, search string) (tenants []models.Tenant, total int64, err error)
 	ListAll() ([]models.Tenant, error)
 	Update(tenant *models.Tenant) error
-	DeleteByID(id uint) error
-	GetByTenantCode(tenantCode string) (*models.Tenant, error)
+	DeleteByUUID(uuid string) error
+	GetByUUID(uuid string) (*models.Tenant, error)
 	GetByDBName(tenantCode string) (*models.Tenant, error)
 	RecoverDeleted(id uint) error
 	FindDeletedByCode(string) (*models.Tenant, error)
@@ -39,9 +39,9 @@ func (r *tenantRepo) GetByID(id uint) (*models.Tenant, error) {
 	return &t, nil
 }
 
-func (r *tenantRepo) GetByTenantCode(tenantCode string) (*models.Tenant, error) {
+func (r *tenantRepo) GetByUUID(uuid string) (*models.Tenant, error) {
 	var t models.Tenant
-	if err := r.db.Where("code = ?", tenantCode).First(&t).Error; err != nil {
+	if err := r.db.Where("uuid = ?", uuid).First(&t).Error; err != nil {
 		return nil, err
 	}
 	return &t, nil
@@ -81,8 +81,8 @@ func (r *tenantRepo) Update(tenant *models.Tenant) error {
 	return r.db.Save(tenant).Error
 }
 
-func (r *tenantRepo) DeleteByID(id uint) error {
-	return r.db.Delete(&models.Tenant{}, id).Error
+func (r *tenantRepo) DeleteByUUID(uuid string) error {
+	return r.db.Delete(&models.Tenant{}, uuid).Error
 }
 
 func (r *tenantRepo) RecoverDeleted(id uint) error {

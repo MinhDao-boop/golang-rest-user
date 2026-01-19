@@ -8,7 +8,8 @@ import (
 )
 
 type ShareDTORequest struct {
-	UserID     uint                 `json:"user_id"`
+	UserUUID   string               `json:"user_uuid"`
+	ZoneUUID   string               `json:"zone_uuid"`
 	Permission enums.UserPermission `json:"permission"`
 }
 

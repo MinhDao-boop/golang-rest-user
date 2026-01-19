@@ -8,19 +8,19 @@ import (
 )
 
 func TenantRoutes(r *gin.RouterGroup) {
-	r.GET("", handler.ListTenant)            // GET /api/v1/tenants
-	r.POST("", handler.CreateTenant)         // POST /api/v1/tenants
-	r.GET("/:code", handler.GetByTenantCode) // GET /api/v1/tenants/:code
-	r.PUT("/:code", handler.UpdateTenant)    // PUT /api/v1/tenants/:code
-	r.DELETE("/:code", handler.DeleteTenant) // DELETE /api/v1/tenants/:code
+	r.GET("", handler.ListTenant)                   // GET /api/v1/tenants
+	r.POST("", handler.CreateTenant)                // POST /api/v1/tenants
+	r.GET("/:tenant_uuid", handler.GetByTenantCode) // GET /api/v1/tenants/:tenant_uuid
+	r.PUT("/:tenant_uuid", handler.UpdateTenant)    // PUT /api/v1/tenants/:tenant_uuid
+	r.DELETE("/:tenant_uuid", handler.DeleteTenant) // DELETE /api/v1/tenants/:tenant_uuid
 }
 
 func UserRoutes(r *gin.RouterGroup) {
-	r.GET("", tenant.ListUsers)           // GET /api/v1/users
-	r.POST("", tenant.CreateUser)         // POST /api/v1/users
-	r.DELETE("", tenant.DeleteManyUsers)  // DELETE /api/v1/users?uuids=1b0f0fe4-8710-4518-b8bc-7f1e52b280e4,1c8edc4f-b1a0-4252-808b-682eb76551ad,...
-	r.GET("/:uuid", tenant.GetByUserUUID) // GET /api/v1/users/:uuid
-	r.PUT("/:uuid", tenant.UpdateUser)    // PUT /api/v1/users/:uuid
+	r.GET("", tenant.ListUsers)                // GET /api/v1/users
+	r.POST("", tenant.CreateUser)              // POST /api/v1/users
+	r.DELETE("", tenant.DeleteManyUsers)       // DELETE /api/v1/users
+	r.GET("/:user_uuid", tenant.GetByUserUUID) // GET /api/v1/users/:user_uuid
+	r.PUT("/:user_uuid", tenant.UpdateUser)    // PUT /api/v1/users/:user_uuid
 }
 
 func AuthRoutes(r *gin.RouterGroup) {
@@ -31,16 +31,16 @@ func AuthRoutes(r *gin.RouterGroup) {
 }
 
 func ZonesRoutes(r *gin.RouterGroup) {
-	r.GET("", tenant.ListZones)                     // GET /api/v1/zones
-	r.GET("/share-with-me", tenant.ListSharedZones) // GET /api/v1/zones/share-with-me
-	r.POST("", tenant.CreateZone)                   // POST /api/v1/zones
-	r.PUT("/:uuid", tenant.UpdateZone)              // PUT /api/v1/zones/:uuid
-	r.DELETE("/:uuid", tenant.DeleteZone)           // DELETE /api/v1/zones/:uuid
+	r.GET("", tenant.ListZones) // GET /api/v1/zones
+	//r.GET("/share-with-me", tenant.ListSharedZones) // GET /api/v1/zones/share-with-me
+	r.POST("", tenant.CreateZone)              // POST /api/v1/zones
+	r.PUT("/:zone_uuid", tenant.UpdateZone)    // PUT /api/v1/zones/:uuid
+	r.DELETE("/:zone_uuid", tenant.DeleteZone) // DELETE /api/v1/zones/:uuid
 }
 
 func ShareRoutes(r *gin.RouterGroup) {
-	r.GET("", tenant.GetSharedUsers)              // GET /api/v1/zones/:uuid/share
-	r.POST("", tenant.ShareZone)                  // POST /api/v1/zones/:uuid/share
-	r.PUT("/:user_uuid", tenant.UpdatePermission) // PUT /api/v1/zones/:uuid/share/:user_uuid
-	r.DELETE("/:user_uuid", tenant.RevokeZone)    // DELETE /api/v1/zones/:uuid/share/:user_uuid
+	r.GET("/:zone_uuid", tenant.GetSharedUsers)              // GET /api/v1/zones/share/:zone_uuid
+	r.POST("", tenant.ShareZone)                             // POST /api/v1/zones/share
+	r.PUT("/:zone_uuid/:user_uuid", tenant.UpdatePermission) // PUT /api/v1/zones/share/:zone_uuid/:user_uuid
+	r.DELETE("/:zone_uuid/:user_uuid", tenant.RevokeZone)    // DELETE /api/v1/zones/share/:zone_uuid/:user_uuid
 }

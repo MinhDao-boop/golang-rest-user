@@ -8,6 +8,10 @@ type CreateUserRequest struct {
 	Position string `json:"position" binding:"omitempty"`
 }
 
+type DeleteUserRequest struct {
+	UUIDs []string `json:"uuid" binding:"required"`
+}
+
 type LoginRequest struct {
 	Username string `json:"username" binding:"required,email"`
 	Password string `json:"password" binding:"required,min=6"`

@@ -18,7 +18,8 @@ type UserService interface {
 	GetByUUID(string) (*dto.UserResponse, error)
 	List(page, pageSize int, search string) ([]dto.UserResponse, int64, error)
 	Update(uuid string, req dto.UpdateUserRequest) (*dto.UserResponse, error)
-	DeleteMany([]string) (int64, error)
+	DeleteMany(dto.DeleteUserRequest) (int64, error)
+	GetByID(uint) (*dto.UserResponse, error)
 }
 
 type userService struct {
@@ -26,11 +27,19 @@ type userService struct {
 	repo       repository.UserRepo
 }
 
+func (s *userService) GetByID(userID uint) (*dto.UserResponse, error) {
+	user, err := s.repo.GetByID(userID)
+	if err != nil {
+		return nil, err
+	}
+	return s.convertToUserResponse(user), nil
+}
+
 func NewUserService(tenantCode string, r repository.UserRepo) UserService {
 	return &userService{repo: r, tenantCode: tenantCode}
 }
 
-func convertToUserResponse(user *models.User) *dto.UserResponse {
+func (s *userService) convertToUserResponse(user *models.User) *dto.UserResponse {
 	return &dto.UserResponse{
 		ID:        user.ID,
 		UUID:      user.UUID,
@@ -67,7 +76,7 @@ func (s *userService) Create(req dto.CreateUserRequest) (*dto.UserResponse, erro
 	if err := s.repo.Create(user); err != nil {
 		return nil, err
 	}
-	return convertToUserResponse(user), nil
+	return s.convertToUserResponse(user), nil
 }
 
 func (s *userService) GetByUUID(uuid string) (*dto.UserResponse, error) {
@@ -75,7 +84,7 @@ func (s *userService) GetByUUID(uuid string) (*dto.UserResponse, error) {
 	if err != nil {
 		return nil, err
 	}
-	return convertToUserResponse(user), nil
+	return s.convertToUserResponse(user), nil
 }
 
 func (s *userService) List(page, pageSize int, search string) ([]dto.UserResponse, int64, error) {
@@ -86,7 +95,7 @@ func (s *userService) List(page, pageSize int, search string) ([]dto.UserRespons
 	}
 	var result []dto.UserResponse
 	for _, u := range users {
-		result = append(result, *convertToUserResponse(&u))
+		result = append(result, *s.convertToUserResponse(&u))
 	}
 	return result, total, nil
 }
@@ -104,20 +113,9 @@ func (s *userService) Update(uuid string, req dto.UpdateUserRequest) (*dto.UserR
 	if err := s.repo.Update(user); err != nil {
 		return nil, err
 	}
-	return convertToUserResponse(user), nil
+	return s.convertToUserResponse(user), nil
 }
 
-func (s *userService) DeleteMany(uuids []string) (int64, error) {
-	ids := []uint{}
-	for _, uu := range uuids {
-		if uu == "" {
-			continue
-		}
-		user, err := s.repo.GetByUUID(uu)
-		if err != nil {
-			return 0, err
-		}
-		ids = append(ids, user.ID)
-	}
-	return s.repo.DeleteByIDs(ids)
+func (s *userService) DeleteMany(req dto.DeleteUserRequest) (int64, error) {
+	return s.repo.DeleteByUUIDs(req.UUIDs)
 }

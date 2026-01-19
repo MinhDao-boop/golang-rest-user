@@ -19,7 +19,7 @@ var dbnameRegex = regexp.MustCompile("^[a-z0-9_]{1,64}$")
 
 type TenantService interface {
 	Create(dto.CreateTenantRequest) (*dto.TenantResponse, error)
-	GetByTenantCode(string) (*dto.TenantResponse, error)
+	GetByUUID(string) (*dto.TenantResponse, error)
 	List(page, pageSize int, search string) ([]dto.TenantResponse, int64, error)
 	ListAllTenantConnect() ([]models.Tenant, error)
 	Update(tenantCode string, req dto.UpdateTenantRequest) (*dto.TenantResponse, error)
@@ -56,7 +56,7 @@ func isValidDBName(name string) bool {
 
 func (s *tenantService) Create(req dto.CreateTenantRequest) (*dto.TenantResponse, error) {
 	// check tenant code existing
-	if _, err := s.repo.GetByTenantCode(req.Code); err == nil {
+	if _, err := s.repo.GetByUUID(req.Code); err == nil {
 		return nil, errors.New("tenant code already exists")
 	}
 	//check db name existing
@@ -101,9 +101,9 @@ func (s *tenantService) Create(req dto.CreateTenantRequest) (*dto.TenantResponse
 	return convertToTenantResponse(tenant), nil
 }
 
-func (s *tenantService) GetByTenantCode(tenantCode string) (*dto.TenantResponse, error) {
-	tenantCode = strings.TrimSpace(strings.ToLower(tenantCode))
-	tenant, err := s.repo.GetByTenantCode(tenantCode)
+func (s *tenantService) GetByUUID(uuid string) (*dto.TenantResponse, error) {
+	uuid = strings.TrimSpace(strings.ToLower(uuid))
+	tenant, err := s.repo.GetByUUID(uuid)
 	if err != nil {
 		return nil, err
 	}
@@ -131,8 +131,8 @@ func (s *tenantService) ListAllTenantConnect() ([]models.Tenant, error) {
 	return tenants, nil
 }
 
-func (s *tenantService) Update(tenantCode string, req dto.UpdateTenantRequest) (*dto.TenantResponse, error) {
-	tenant, err := s.repo.GetByTenantCode(tenantCode)
+func (s *tenantService) Update(uuid string, req dto.UpdateTenantRequest) (*dto.TenantResponse, error) {
+	tenant, err := s.repo.GetByUUID(uuid)
 	if err != nil {
 		return nil, err
 	}
@@ -198,8 +198,8 @@ func needReconnect(oldTenant *models.Tenant, req dto.UpdateTenantRequest) bool {
 		oldTenant.DBPort != req.DBPort
 }
 
-func (s *tenantService) Delete(tenantCode string) error {
-	tenant, err := s.repo.GetByTenantCode(tenantCode)
+func (s *tenantService) Delete(uuid string) error {
+	tenant, err := s.repo.GetByUUID(uuid)
 	if err != nil {
 		return err
 	}
@@ -208,7 +208,7 @@ func (s *tenantService) Delete(tenantCode string) error {
 			s.callBackFunction(enums.DeleteTenantConnect, tenant.Code, tenant)
 		}()
 	}
-	return s.repo.DeleteByID(tenant.BaseModel.ID)
+	return s.repo.DeleteByUUID(tenant.BaseModel.UUID)
 }
 
 func (s *tenantService) SetCallBackFunction(callBackFunction CallBackFunction) {
