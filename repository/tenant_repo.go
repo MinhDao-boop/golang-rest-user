@@ -82,7 +82,7 @@ func (r *tenantRepo) Update(tenant *models.Tenant) error {
 }
 
 func (r *tenantRepo) DeleteByUUID(uuid string) error {
-	return r.db.Delete(&models.Tenant{}, uuid).Error
+	return r.db.Where("uuid = ?", uuid).Delete(&models.Tenant{}).Error
 }
 
 func (r *tenantRepo) RecoverDeleted(id uint) error {

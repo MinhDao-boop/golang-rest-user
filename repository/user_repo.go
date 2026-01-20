@@ -62,7 +62,7 @@ func (r *userRepo) Update(user *models.User) error {
 }
 
 func (r *userRepo) DeleteByUUIDs(uuids []string) (int64, error) {
-	res := r.db.Delete(&models.User{}, uuids)
+	res := r.db.Where("uuid IN ?", uuids).Delete(&models.User{})
 	return res.RowsAffected, res.Error
 }
 

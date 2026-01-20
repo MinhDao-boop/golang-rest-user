@@ -37,10 +37,6 @@ func (r *zoneRepoImpl) GetSubtreeByPath(path string) ([]models.Zone, error) {
 	return zones, nil
 }
 
-func NewZoneRepo(db *gorm.DB) ZoneRepo {
-	return &zoneRepoImpl{db: db}
-}
-
 func (r *zoneRepoImpl) Create(zone *models.Zone) error {
 	return r.db.Create(zone).Error
 }
@@ -81,4 +77,8 @@ func (r *zoneRepoImpl) GetByPath(path string) ([]models.Zone, error) {
 		return nil, err
 	}
 	return zones, nil
+}
+
+func NewZoneRepo(db *gorm.DB) ZoneRepo {
+	return &zoneRepoImpl{db: db}
 }

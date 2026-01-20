@@ -15,11 +15,11 @@ type CreateTenantRequest struct {
 }
 
 type UpdateTenantRequest struct {
-	Name   string `json:"name" binding:"required"`
-	DBUser string `json:"db_user" binding:"required"`
-	DBPass string `json:"db_pass" binding:"required"`
-	DBHost string `json:"db_host" binding:"required"`
-	DBPort string `json:"db_port" binding:"required"`
+	Name   string `json:"name" binding:"omitempty"`
+	DBUser string `json:"db_user" binding:"omitempty"`
+	DBPass string `json:"db_pass" binding:"omitempty"`
+	DBHost string `json:"db_host" binding:"omitempty"`
+	DBPort string `json:"db_port" binding:"omitempty"`
 }
 
 type TenantResponse struct {

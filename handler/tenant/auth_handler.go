@@ -46,7 +46,7 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	tokens, err := service.AuthService.Login(tenantCode, req)
+	tokens, err := service.AuthService.Login(req)
 	if err != nil {
 		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusUnauthorized)
 		return
@@ -68,7 +68,7 @@ func Refresh(c *gin.Context) {
 		return
 	}
 
-	tokens, err := service.AuthService.Refresh(tenantCode, req.RefreshToken)
+	tokens, err := service.AuthService.Refresh(req.RefreshToken)
 	if err != nil {
 		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusUnauthorized)
 		return
@@ -89,7 +89,7 @@ func Logout(c *gin.Context) {
 		return
 	}
 
-	if err := service.AuthService.Logout(tenantCode, req.RefreshToken); err != nil {
+	if err := service.AuthService.Logout(req.RefreshToken); err != nil {
 		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusUnauthorized)
 		return
 	}

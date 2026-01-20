@@ -14,15 +14,15 @@ type UserZoneRepo interface {
 	GetPermission(userID uint, path string) (string, error)
 	GetZoneID(userID uint) (uint, error)
 	GetSharedUser(uint) ([]models.UserZone, error)
-	GetSharedZone(uint) ([]models.UserZone, error)
+	GetByUserID(uint) ([]models.UserZone, error)
 }
 
 type userZoneRepoImpl struct {
 	db *gorm.DB
 }
 
-func (r *userZoneRepoImpl) GetSharedZone(userID uint) (userZones []models.UserZone, err error) {
-	if err = r.db.Where("user_id = ? AND permission NOT LIKE 'owner'", userID).
+func (r *userZoneRepoImpl) GetByUserID(userID uint) (userZones []models.UserZone, err error) {
+	if err = r.db.Where("user_id = ?", userID).
 		Find(&userZones).Error; err != nil {
 		return nil, err
 	}

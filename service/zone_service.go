@@ -6,6 +6,8 @@ import (
 	"golang-rest-user/enums"
 	"golang-rest-user/models"
 	"golang-rest-user/repository"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -14,7 +16,7 @@ import (
 type ZoneService interface {
 	CreateZone(request *dto.ZoneDTORequest, userID uint) (*dto.ZoneDTOResponse, error)
 	UpdateZone(request *dto.ZoneDTORequest, uuid string) (*dto.ZoneDTOResponse, error)
-	GetZonesByUser(userID uint) ([]dto.ZoneDTOResponse, error)
+	GetZonesByUser(userID uint, isOwner, isShared bool, zoneUUID *string) ([]dto.ZoneDTOResponse, error)
 	DeleteZones(uuid string) (int64, error)
 	GetByUUID(uuid string) (*dto.ZoneDTOResponse, error)
 }
@@ -109,18 +111,75 @@ func (s *zoneServiceImpl) UpdateZone(request *dto.ZoneDTORequest, uuid string) (
 	}
 	return s.convertToZoneDTOResponse(zone), nil
 }
-func (s *zoneServiceImpl) GetZonesByUser(userID uint) ([]dto.ZoneDTOResponse, error) {
-	zoneID, err := s.userZoneRepo.GetZoneID(userID)
-	zone, _ := s.zoneRepo.GetByID(zoneID)
-	subZones, err := s.zoneRepo.GetSubtreeByPath(zone.Path)
+
+func (s *zoneServiceImpl) GetZonesByUser(userID uint, isOwner, isShared bool, zoneUUID *string) ([]dto.ZoneDTOResponse, error) {
+	var rootPath string
+	if zoneUUID != nil {
+		rootZone, err := s.zoneRepo.GetByUUID(*zoneUUID)
+		if err != nil {
+			return nil, err
+		}
+		rootPath = rootZone.Path
+	}
+
+	// 2. lấy user_zones
+	userZones, err := s.userZoneRepo.GetByUserID(userID)
 	if err != nil {
 		return nil, err
 	}
-	zoneResponses := make([]dto.ZoneDTOResponse, 0)
-	for _, z := range subZones {
-		zoneResponses = append(zoneResponses, *s.convertToZoneDTOResponse(&z))
+
+	zoneMap := make(map[uint]models.Zone)
+
+	for _, uz := range userZones {
+
+		// scope filter
+		if isOwner && uz.Permission != enums.UserOwner {
+			continue
+		}
+		if isShared && uz.Permission == enums.UserOwner {
+			continue
+		}
+
+		zone, err := s.zoneRepo.GetByID(uz.ZoneID)
+		if err != nil {
+			continue
+		}
+
+		// subtree
+		subZones, err := s.zoneRepo.GetSubtreeByPath(zone.Path)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, z := range subZones {
+
+			// nếu có zoneUUID → filter subtree
+			if rootPath != "" && !strings.HasPrefix(z.Path, rootPath) {
+				continue
+			}
+
+			zoneMap[z.ID] = z
+		}
 	}
-	return zoneResponses, nil
+
+	// 3. convert map → slice
+	zones := make([]models.Zone, 0, len(zoneMap))
+	for _, z := range zoneMap {
+		zones = append(zones, z)
+	}
+
+	// 4. sort theo level
+	sort.Slice(zones, func(i, j int) bool {
+		return zones[i].Level < zones[j].Level
+	})
+
+	// 5. convert DTO
+	res := make([]dto.ZoneDTOResponse, 0, len(zones))
+	for _, z := range zones {
+		res = append(res, *s.convertToZoneDTOResponse(&z))
+	}
+
+	return res, nil
 }
 
 func NewZoneService(zoneRepo repository.ZoneRepo, userZoneRepo repository.UserZoneRepo) ZoneService {

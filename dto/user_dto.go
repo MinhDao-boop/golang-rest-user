@@ -9,7 +9,7 @@ type CreateUserRequest struct {
 }
 
 type DeleteUserRequest struct {
-	UUIDs []string `json:"uuid" binding:"required"`
+	UUIDs string `json:"uuid" binding:"omitempty"`
 }
 
 type LoginRequest struct {

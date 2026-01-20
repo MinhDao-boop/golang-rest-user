@@ -39,30 +39,17 @@ func ListZones(c *gin.Context) {
 	if tenantCode == "" {
 		return
 	}
+	isOwner := c.Query("isOwner") == "true"
+	isShared := c.Query("isShared") == "true"
+	zoneUUID := c.Query("zoneUUID")
 	service := tenantProvider.GetTenantInfo(tenantCode)
-	zoneResponse, err := service.ZoneService.GetZonesByUser(userId)
+	zoneResponse, err := service.ZoneService.GetZonesByUser(userId, isOwner, isShared, &zoneUUID)
 	if err != nil {
 		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
 		return
 	}
 	response.Success(c, zoneResponse)
 }
-
-// GET /zones/share-with-me
-//func ListSharedZones(c *gin.Context) {
-//	tenantCode := c.GetString("tenant_code")
-//	if tenantCode == "" {
-//		return
-//	}
-//	userID := c.GetUint("user_id")
-//	service := tenantProvider.GetTenantInfo(tenantCode)
-//	zoneResponses, err := service.ZoneService.GetSharedZone(userID)
-//	if err != nil {
-//		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusInternalServerError)
-//		return
-//	}
-//	response.Success(c, zoneResponses)
-//}
 
 // PUT /zone/:zone_uuid
 func UpdateZone(c *gin.Context) {

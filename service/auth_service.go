@@ -10,37 +10,41 @@ import (
 	"time"
 
 	"golang-rest-user/dto"
-	"golang-rest-user/repository"
 	"golang-rest-user/security"
 )
 
 type AuthService interface {
 	Register(req dto.CreateUserRequest) (*dto.UserResponse, error)
-	Login(tenantCode string, req dto.LoginRequest) (map[string]interface{}, error)
-	Refresh(tenantCode, refreshToken string) (map[string]interface{}, error)
-	Logout(tenantCode, refreshToken string) error
+	Login(req dto.LoginRequest) (map[string]interface{}, error)
+	Refresh(refreshToken string) (map[string]interface{}, error)
+	Logout(refreshToken string) error
 }
 
 type authService struct {
-	userRepo    repository.UserRepo
-	jwtManager  *security.Manager
-	userService UserService
+	userSvc    UserService
+	jwtManager *security.Manager
+	tenantCode string
 }
 
-func NewAuthService(userRepo repository.UserRepo, jwtManager *security.Manager) AuthService {
+func NewAuthService(userSvc UserService, jwtManager *security.Manager, tenantCode string) AuthService {
 	return &authService{
-		userRepo:   userRepo,
+		userSvc:    userSvc,
 		jwtManager: jwtManager,
+		tenantCode: tenantCode,
 	}
 }
 
 func (s *authService) Register(req dto.CreateUserRequest) (*dto.UserResponse, error) {
-	return s.userService.Create(req)
+	userResponse, err := s.userSvc.Create(req)
+	if err != nil {
+		return nil, err
+	}
+	return userResponse, nil
 }
 
-func (s *authService) Login(tenantCode string, req dto.LoginRequest) (map[string]interface{}, error) {
+func (s *authService) Login(req dto.LoginRequest) (map[string]interface{}, error) {
 
-	user, err := s.userRepo.GetByUsername(req.Username)
+	user, err := s.userSvc.GetByUsername(req.Username)
 	if err != nil {
 		return nil, errors.New("invalid credentials")
 	}
@@ -50,14 +54,14 @@ func (s *authService) Login(tenantCode string, req dto.LoginRequest) (map[string
 		return nil, errors.New("invalid credentials")
 	}
 
-	ver := redisProvider.GetTokenVer(user.ID, tenantCode)
+	ver := redisProvider.GetTokenVer(user.ID, s.tenantCode)
 
-	aToken, err := s.jwtManager.GenerateToken(user.ID, user.Username, tenantCode, enums.TokenTypeAccess, 900, ver)
+	aToken, err := s.jwtManager.GenerateToken(user.ID, user.Username, s.tenantCode, enums.TokenTypeAccess, 900, ver)
 	if err != nil {
 		return nil, err
 	}
 
-	rToken, err := s.jwtManager.GenerateToken(user.ID, user.Username, tenantCode, enums.TokenTypeRefresh, 604800, ver)
+	rToken, err := s.jwtManager.GenerateToken(user.ID, user.Username, s.tenantCode, enums.TokenTypeRefresh, 604800, ver)
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +69,7 @@ func (s *authService) Login(tenantCode string, req dto.LoginRequest) (map[string
 	hash := hashToken(rToken.Token)
 	ttl := time.Duration(rToken.ExpiresIn) * time.Second
 
-	err = redisProvider.Create(hash, user.ID, tenantCode, ttl)
+	err = redisProvider.Create(hash, user.ID, s.tenantCode, ttl)
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +87,7 @@ func hashToken(rToken string) string {
 	return hex.EncodeToString(h[:])
 }
 
-func (s *authService) Refresh(tenantCode, rToken string) (map[string]interface{}, error) {
+func (s *authService) Refresh(rToken string) (map[string]interface{}, error) {
 	claims, err := s.jwtManager.ParseToken(rToken)
 
 	if claims == nil {
@@ -94,7 +98,7 @@ func (s *authService) Refresh(tenantCode, rToken string) (map[string]interface{}
 		return nil, errors.New("invalid refresh token")
 	}
 
-	if tenantCode != claims.TenantCode {
+	if s.tenantCode != claims.TenantCode {
 		return nil, errors.New("invalid tenant code")
 	}
 
@@ -127,7 +131,7 @@ func (s *authService) Refresh(tenantCode, rToken string) (map[string]interface{}
 	}, nil
 }
 
-func (s *authService) Logout(tenantCode, rToken string) error {
+func (s *authService) Logout(rToken string) error {
 	claims, err := s.jwtManager.ParseToken(rToken)
 	if claims == nil {
 		return errors.New("invalid token")
@@ -135,7 +139,7 @@ func (s *authService) Logout(tenantCode, rToken string) error {
 	if err != nil || claims.Type != enums.TokenTypeRefresh {
 		return errors.New("invalid refresh token")
 	}
-	if tenantCode != claims.TenantCode {
+	if s.tenantCode != claims.TenantCode {
 		return errors.New("invalid tenant code")
 	}
 

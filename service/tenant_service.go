@@ -11,6 +11,8 @@ import (
 	"golang-rest-user/dto"
 	"golang-rest-user/repository"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type CallBackFunction func(mode enums.HandleTenant, tenantCode string, tenant *models.Tenant)
@@ -36,7 +38,7 @@ func NewTenantService(r repository.TenantRepo) TenantService {
 	return &tenantService{repo: r}
 }
 
-func convertToTenantResponse(tenant *models.Tenant) *dto.TenantResponse {
+func (s *tenantService) convertToTenantResponse(tenant *models.Tenant) *dto.TenantResponse {
 	return &dto.TenantResponse{
 		ID:        tenant.ID,
 		Code:      tenant.Code,
@@ -86,6 +88,7 @@ func (s *tenantService) Create(req dto.CreateTenantRequest) (*dto.TenantResponse
 		DBPort: req.DBPort,
 		DBName: req.DBName,
 	}
+	tenant.UUID = uuid.New().String()
 	tenant.CreatedAt = time.Now()
 	if s.callBackFunction != nil {
 		go func() {
@@ -98,7 +101,7 @@ func (s *tenantService) Create(req dto.CreateTenantRequest) (*dto.TenantResponse
 		}()
 		return nil, err
 	}
-	return convertToTenantResponse(tenant), nil
+	return s.convertToTenantResponse(tenant), nil
 }
 
 func (s *tenantService) GetByUUID(uuid string) (*dto.TenantResponse, error) {
@@ -107,7 +110,7 @@ func (s *tenantService) GetByUUID(uuid string) (*dto.TenantResponse, error) {
 	if err != nil {
 		return nil, err
 	}
-	return convertToTenantResponse(tenant), nil
+	return s.convertToTenantResponse(tenant), nil
 }
 
 func (s *tenantService) List(page, pageSize int, search string) ([]dto.TenantResponse, int64, error) {
@@ -118,7 +121,7 @@ func (s *tenantService) List(page, pageSize int, search string) ([]dto.TenantRes
 	}
 	var result []dto.TenantResponse
 	for _, t := range tenants {
-		result = append(result, *convertToTenantResponse(&t))
+		result = append(result, *s.convertToTenantResponse(&t))
 	}
 	return result, total, nil
 }
@@ -157,7 +160,7 @@ func (s *tenantService) Update(uuid string, req dto.UpdateTenantRequest) (*dto.T
 		if err := s.repo.Update(tenant); err != nil {
 			return nil, err
 		}
-		return convertToTenantResponse(tenant), nil
+		return s.convertToTenantResponse(tenant), nil
 	}
 	//AESGCMEncrypt db user
 	encryptedUser, err := utils.AESGCMEncrypt(req.DBUser)
@@ -188,7 +191,7 @@ func (s *tenantService) Update(uuid string, req dto.UpdateTenantRequest) (*dto.T
 		return nil, err
 	}
 
-	return convertToTenantResponse(tenant), nil
+	return s.convertToTenantResponse(tenant), nil
 }
 
 func needReconnect(oldTenant *models.Tenant, req dto.UpdateTenantRequest) bool {

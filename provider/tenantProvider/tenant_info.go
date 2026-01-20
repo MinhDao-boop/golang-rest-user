@@ -53,7 +53,7 @@ func (t *TenantInfo) InitService() {
 	t.UserService = service.NewUserService(t.Info.Code, userRepo)
 
 	jwtManager := appService.JWTManager
-	t.AuthService = service.NewAuthService(userRepo, jwtManager)
+	t.AuthService = service.NewAuthService(t.UserService, jwtManager, t.Info.Code)
 
 	zoneRepo := repository.NewZoneRepo(t.db)
 	userZoneRepo := repository.NewUserZoneRepo(t.db)

@@ -20,11 +20,20 @@ type UserService interface {
 	Update(uuid string, req dto.UpdateUserRequest) (*dto.UserResponse, error)
 	DeleteMany(dto.DeleteUserRequest) (int64, error)
 	GetByID(uint) (*dto.UserResponse, error)
+	GetByUsername(string) (*models.User, error)
 }
 
 type userService struct {
 	tenantCode string
 	repo       repository.UserRepo
+}
+
+func (s *userService) GetByUsername(username string) (*models.User, error) {
+	user, err := s.repo.GetByUsername(username)
+	if err != nil {
+		return nil, err
+	}
+	return user, nil
 }
 
 func (s *userService) GetByID(userID uint) (*dto.UserResponse, error) {
@@ -117,5 +126,7 @@ func (s *userService) Update(uuid string, req dto.UpdateUserRequest) (*dto.UserR
 }
 
 func (s *userService) DeleteMany(req dto.DeleteUserRequest) (int64, error) {
-	return s.repo.DeleteByUUIDs(req.UUIDs)
+	req.UUIDs = strings.TrimSpace(req.UUIDs)
+	uuids := strings.Split(req.UUIDs, ",")
+	return s.repo.DeleteByUUIDs(uuids)
 }
