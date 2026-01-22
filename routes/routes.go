@@ -31,8 +31,7 @@ func AuthRoutes(r *gin.RouterGroup) {
 }
 
 func ZonesRoutes(r *gin.RouterGroup) {
-	r.GET("", tenant.ListZones) // GET /api/v1/zones
-	//r.GET("/share-with-me", tenant.ListSharedZones) // GET /api/v1/zones/share-with-me
+	r.GET("", tenant.ListZones)                // GET /api/v1/zones
 	r.POST("", tenant.CreateZone)              // POST /api/v1/zones
 	r.PUT("/:zone_uuid", tenant.UpdateZone)    // PUT /api/v1/zones/:uuid
 	r.DELETE("/:zone_uuid", tenant.DeleteZone) // DELETE /api/v1/zones/:uuid

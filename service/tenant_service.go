@@ -29,18 +29,18 @@ type TenantService interface {
 	SetCallBackFunction(CallBackFunction)
 }
 
-type tenantService struct {
+type tenantServiceImpl struct {
 	callBackFunction CallBackFunction
 	repo             repository.TenantRepo
 }
 
 func NewTenantService(r repository.TenantRepo) TenantService {
-	return &tenantService{repo: r}
+	return &tenantServiceImpl{repo: r}
 }
 
-func (s *tenantService) convertToTenantResponse(tenant *models.Tenant) *dto.TenantResponse {
+func (s *tenantServiceImpl) convertToTenantResponse(tenant *models.Tenant) *dto.TenantResponse {
 	return &dto.TenantResponse{
-		ID:        tenant.ID,
+		UUID:      tenant.UUID,
 		Code:      tenant.Code,
 		Name:      tenant.Name,
 		DBHost:    tenant.DBHost,
@@ -56,7 +56,7 @@ func isValidDBName(name string) bool {
 	return dbnameRegex.MatchString(name)
 }
 
-func (s *tenantService) Create(req dto.CreateTenantRequest) (*dto.TenantResponse, error) {
+func (s *tenantServiceImpl) Create(req dto.CreateTenantRequest) (*dto.TenantResponse, error) {
 	// check tenant code existing
 	if _, err := s.repo.GetByUUID(req.Code); err == nil {
 		return nil, errors.New("tenant code already exists")
@@ -104,7 +104,7 @@ func (s *tenantService) Create(req dto.CreateTenantRequest) (*dto.TenantResponse
 	return s.convertToTenantResponse(tenant), nil
 }
 
-func (s *tenantService) GetByUUID(uuid string) (*dto.TenantResponse, error) {
+func (s *tenantServiceImpl) GetByUUID(uuid string) (*dto.TenantResponse, error) {
 	uuid = strings.TrimSpace(strings.ToLower(uuid))
 	tenant, err := s.repo.GetByUUID(uuid)
 	if err != nil {
@@ -113,7 +113,7 @@ func (s *tenantService) GetByUUID(uuid string) (*dto.TenantResponse, error) {
 	return s.convertToTenantResponse(tenant), nil
 }
 
-func (s *tenantService) List(page, pageSize int, search string) ([]dto.TenantResponse, int64, error) {
+func (s *tenantServiceImpl) List(page, pageSize int, search string) ([]dto.TenantResponse, int64, error) {
 	search = strings.TrimSpace(search)
 	tenants, total, err := s.repo.GetList(page, pageSize, search)
 	if err != nil {
@@ -126,7 +126,7 @@ func (s *tenantService) List(page, pageSize int, search string) ([]dto.TenantRes
 	return result, total, nil
 }
 
-func (s *tenantService) ListAllTenantConnect() ([]models.Tenant, error) {
+func (s *tenantServiceImpl) ListAllTenantConnect() ([]models.Tenant, error) {
 	tenants, err := s.repo.ListAll()
 	if err != nil {
 		return nil, err
@@ -134,7 +134,7 @@ func (s *tenantService) ListAllTenantConnect() ([]models.Tenant, error) {
 	return tenants, nil
 }
 
-func (s *tenantService) Update(uuid string, req dto.UpdateTenantRequest) (*dto.TenantResponse, error) {
+func (s *tenantServiceImpl) Update(uuid string, req dto.UpdateTenantRequest) (*dto.TenantResponse, error) {
 	tenant, err := s.repo.GetByUUID(uuid)
 	if err != nil {
 		return nil, err
@@ -201,7 +201,7 @@ func needReconnect(oldTenant *models.Tenant, req dto.UpdateTenantRequest) bool {
 		oldTenant.DBPort != req.DBPort
 }
 
-func (s *tenantService) Delete(uuid string) error {
+func (s *tenantServiceImpl) Delete(uuid string) error {
 	tenant, err := s.repo.GetByUUID(uuid)
 	if err != nil {
 		return err
@@ -214,6 +214,6 @@ func (s *tenantService) Delete(uuid string) error {
 	return s.repo.DeleteByUUID(tenant.BaseModel.UUID)
 }
 
-func (s *tenantService) SetCallBackFunction(callBackFunction CallBackFunction) {
+func (s *tenantServiceImpl) SetCallBackFunction(callBackFunction CallBackFunction) {
 	s.callBackFunction = callBackFunction
 }

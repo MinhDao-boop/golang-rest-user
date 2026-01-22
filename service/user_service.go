@@ -23,12 +23,12 @@ type UserService interface {
 	GetByUsername(string) (*models.User, error)
 }
 
-type userService struct {
+type userServiceImpl struct {
 	tenantCode string
 	repo       repository.UserRepo
 }
 
-func (s *userService) GetByUsername(username string) (*models.User, error) {
+func (s *userServiceImpl) GetByUsername(username string) (*models.User, error) {
 	user, err := s.repo.GetByUsername(username)
 	if err != nil {
 		return nil, err
@@ -36,7 +36,7 @@ func (s *userService) GetByUsername(username string) (*models.User, error) {
 	return user, nil
 }
 
-func (s *userService) GetByID(userID uint) (*dto.UserResponse, error) {
+func (s *userServiceImpl) GetByID(userID uint) (*dto.UserResponse, error) {
 	user, err := s.repo.GetByID(userID)
 	if err != nil {
 		return nil, err
@@ -45,10 +45,10 @@ func (s *userService) GetByID(userID uint) (*dto.UserResponse, error) {
 }
 
 func NewUserService(tenantCode string, r repository.UserRepo) UserService {
-	return &userService{repo: r, tenantCode: tenantCode}
+	return &userServiceImpl{repo: r, tenantCode: tenantCode}
 }
 
-func (s *userService) convertToUserResponse(user *models.User) *dto.UserResponse {
+func (s *userServiceImpl) convertToUserResponse(user *models.User) *dto.UserResponse {
 	return &dto.UserResponse{
 		ID:        user.ID,
 		UUID:      user.UUID,
@@ -61,7 +61,7 @@ func (s *userService) convertToUserResponse(user *models.User) *dto.UserResponse
 	}
 }
 
-func (s *userService) Create(req dto.CreateUserRequest) (*dto.UserResponse, error) {
+func (s *userServiceImpl) Create(req dto.CreateUserRequest) (*dto.UserResponse, error) {
 	// check username existing
 	if _, err := s.repo.GetByUsername(req.Username); err == nil {
 		return nil, fmt.Errorf("username already exists")
@@ -88,7 +88,7 @@ func (s *userService) Create(req dto.CreateUserRequest) (*dto.UserResponse, erro
 	return s.convertToUserResponse(user), nil
 }
 
-func (s *userService) GetByUUID(uuid string) (*dto.UserResponse, error) {
+func (s *userServiceImpl) GetByUUID(uuid string) (*dto.UserResponse, error) {
 	user, err := s.repo.GetByUUID(uuid)
 	if err != nil {
 		return nil, err
@@ -96,7 +96,7 @@ func (s *userService) GetByUUID(uuid string) (*dto.UserResponse, error) {
 	return s.convertToUserResponse(user), nil
 }
 
-func (s *userService) List(page, pageSize int, search string) ([]dto.UserResponse, int64, error) {
+func (s *userServiceImpl) List(page, pageSize int, search string) ([]dto.UserResponse, int64, error) {
 	search = strings.TrimSpace(search)
 	users, total, err := s.repo.GetList(page, pageSize, search)
 	if err != nil {
@@ -109,7 +109,7 @@ func (s *userService) List(page, pageSize int, search string) ([]dto.UserRespons
 	return result, total, nil
 }
 
-func (s *userService) Update(uuid string, req dto.UpdateUserRequest) (*dto.UserResponse, error) {
+func (s *userServiceImpl) Update(uuid string, req dto.UpdateUserRequest) (*dto.UserResponse, error) {
 	user, err := s.repo.GetByUUID(uuid)
 	if err != nil {
 		return nil, err
@@ -125,7 +125,7 @@ func (s *userService) Update(uuid string, req dto.UpdateUserRequest) (*dto.UserR
 	return s.convertToUserResponse(user), nil
 }
 
-func (s *userService) DeleteMany(req dto.DeleteUserRequest) (int64, error) {
+func (s *userServiceImpl) DeleteMany(req dto.DeleteUserRequest) (int64, error) {
 	req.UUIDs = strings.TrimSpace(req.UUIDs)
 	uuids := strings.Split(req.UUIDs, ",")
 	return s.repo.DeleteByUUIDs(uuids)

@@ -40,12 +40,12 @@ func ShareZone(c *gin.Context) {
 		return
 	}
 	service := tenantProvider.GetTenantInfo(tenantCode)
-	shareResponse, err := service.ShareService.ShareZone(shareUserID, req)
+	err := service.ShareService.ShareZone(shareUserID, req)
 	if err != nil {
 		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
 		return
 	}
-	response.Success(c, shareResponse)
+	response.Success(c, nil)
 }
 
 // PUT /zones/share/:zone_uuid/:user_uuid

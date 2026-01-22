@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	"fmt"
 	"golang-rest-user/dto"
 	"golang-rest-user/enums"
@@ -15,15 +16,33 @@ import (
 
 type ZoneService interface {
 	CreateZone(request *dto.ZoneDTORequest, userID uint) (*dto.ZoneDTOResponse, error)
-	UpdateZone(request *dto.ZoneDTORequest, uuid string) (*dto.ZoneDTOResponse, error)
-	GetZonesByUser(userID uint, isOwner, isShared bool, zoneUUID *string) ([]dto.ZoneDTOResponse, error)
-	DeleteZones(uuid string) (int64, error)
+	UpdateZone(request *dto.ZoneDTORequest, uuid string, userID uint) (*dto.ZoneDTOResponse, error)
+	GetZonesByUser(userID uint, isOwner, isShared bool, zoneUUID string) ([]dto.ZoneDTOResponse, error)
+	DeleteZones(uuid string, userID uint) (int64, error)
 	GetByUUID(uuid string) (*dto.ZoneDTOResponse, error)
+	GetByUUIDs(uuids []string) ([]models.Zone, error)
+	CheckOwnership(path string, userID uint) bool
 }
 
 type zoneServiceImpl struct {
 	zoneRepo     repository.ZoneRepo
 	userZoneRepo repository.UserZoneRepo
+}
+
+func (s *zoneServiceImpl) CheckOwnership(path string, userID uint) bool {
+	curPermission, err := s.userZoneRepo.GetPermission(userID, path)
+	if err != nil || strings.Compare(curPermission, string(enums.UserOwner)) != 0 {
+		return false
+	}
+	return true
+}
+
+func (s *zoneServiceImpl) GetByUUIDs(uuids []string) ([]models.Zone, error) {
+	zones, err := s.zoneRepo.GetByUUIDs(uuids)
+	if err != nil {
+		return nil, err
+	}
+	return zones, nil
 }
 
 func (s *zoneServiceImpl) GetByUUID(uuid string) (*dto.ZoneDTOResponse, error) {
@@ -34,10 +53,13 @@ func (s *zoneServiceImpl) GetByUUID(uuid string) (*dto.ZoneDTOResponse, error) {
 	return s.convertToZoneDTOResponse(zone), nil
 }
 
-func (s *zoneServiceImpl) DeleteZones(uuid string) (int64, error) {
+func (s *zoneServiceImpl) DeleteZones(uuid string, userID uint) (int64, error) {
 	zone, err := s.zoneRepo.GetByUUID(uuid)
 	if err != nil {
 		return 0, err
+	}
+	if !s.CheckOwnership(zone.Path, userID) {
+		return 0, errors.New("permission denied")
 	}
 	return s.zoneRepo.DeleteByPath(zone.Path)
 }
@@ -45,14 +67,14 @@ func (s *zoneServiceImpl) DeleteZones(uuid string) (int64, error) {
 func (s *zoneServiceImpl) CreateZone(request *dto.ZoneDTORequest, userID uint) (*dto.ZoneDTOResponse, error) {
 	var parentPath string
 	var parentLevel int
-	//if _, err := s.zoneRepo.GetByName(request.Name); err == nil {
-	//	return nil, fmt.Errorf("zone with name %s already exists", request.Name)
-	//}
 	if request.ParentID != nil {
 
 		parentZone, err := s.zoneRepo.GetByID(*request.ParentID)
 		if err != nil {
 			return nil, err
+		}
+		if !s.CheckOwnership(parentZone.Path, userID) {
+			return nil, errors.New("permission denied")
 		}
 		parentPath = parentZone.Path
 		parentLevel = parentZone.Level
@@ -92,10 +114,13 @@ func (s *zoneServiceImpl) CreateZone(request *dto.ZoneDTORequest, userID uint) (
 	}
 	return s.convertToZoneDTOResponse(&newZone), nil
 }
-func (s *zoneServiceImpl) UpdateZone(request *dto.ZoneDTORequest, uuid string) (*dto.ZoneDTOResponse, error) {
+func (s *zoneServiceImpl) UpdateZone(request *dto.ZoneDTORequest, uuid string, userID uint) (*dto.ZoneDTOResponse, error) {
 	zone, err := s.zoneRepo.GetByUUID(uuid)
 	if err != nil {
 		return nil, err
+	}
+	if !s.CheckOwnership(zone.Path, userID) {
+		return nil, errors.New("permission denied")
 	}
 	zone.Name = request.Name
 	zone.Type = request.Type
@@ -112,17 +137,16 @@ func (s *zoneServiceImpl) UpdateZone(request *dto.ZoneDTORequest, uuid string) (
 	return s.convertToZoneDTOResponse(zone), nil
 }
 
-func (s *zoneServiceImpl) GetZonesByUser(userID uint, isOwner, isShared bool, zoneUUID *string) ([]dto.ZoneDTOResponse, error) {
+func (s *zoneServiceImpl) GetZonesByUser(userID uint, isOwner, isShared bool, zoneUUID string) ([]dto.ZoneDTOResponse, error) {
 	var rootPath string
-	if zoneUUID != nil {
-		rootZone, err := s.zoneRepo.GetByUUID(*zoneUUID)
+	if zoneUUID != "" {
+		rootZone, err := s.zoneRepo.GetByUUID(zoneUUID)
 		if err != nil {
 			return nil, err
 		}
 		rootPath = rootZone.Path
 	}
 
-	// 2. lấy user_zones
 	userZones, err := s.userZoneRepo.GetByUserID(userID)
 	if err != nil {
 		return nil, err
@@ -132,7 +156,6 @@ func (s *zoneServiceImpl) GetZonesByUser(userID uint, isOwner, isShared bool, zo
 
 	for _, uz := range userZones {
 
-		// scope filter
 		if isOwner && uz.Permission != enums.UserOwner {
 			continue
 		}
@@ -169,7 +192,7 @@ func (s *zoneServiceImpl) GetZonesByUser(userID uint, isOwner, isShared bool, zo
 	}
 
 	// 4. sort theo level
-	sort.Slice(zones, func(i, j int) bool {
+	sort.SliceStable(zones, func(i, j int) bool {
 		return zones[i].Level < zones[j].Level
 	})
 
@@ -178,7 +201,9 @@ func (s *zoneServiceImpl) GetZonesByUser(userID uint, isOwner, isShared bool, zo
 	for _, z := range zones {
 		res = append(res, *s.convertToZoneDTOResponse(&z))
 	}
-
+	if len(res) == 0 {
+		return nil, nil
+	}
 	return res, nil
 }
 

@@ -12,12 +12,19 @@ type ZoneRepo interface {
 	DeleteByPath(string) (deleted int64, err error)
 	GetByID(uint) (*models.Zone, error)
 	GetByUUID(string) (*models.Zone, error)
+	GetByUUIDs([]string) ([]models.Zone, error)
 	UpdateZonePath(uint, string) error
 	GetSubtreeByPath(path string) ([]models.Zone, error)
 }
 
 type zoneRepoImpl struct {
 	db *gorm.DB
+}
+
+func (r *zoneRepoImpl) GetByUUIDs(uuids []string) ([]models.Zone, error) {
+	var zones []models.Zone
+	err := r.db.Model(&zones).Where("uuid IN ?", uuids).Find(&zones).Error
+	return zones, err
 }
 
 func (r *zoneRepoImpl) GetByUUID(uuid string) (*models.Zone, error) {

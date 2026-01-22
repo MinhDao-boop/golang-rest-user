@@ -39,11 +39,11 @@ func ListZones(c *gin.Context) {
 	if tenantCode == "" {
 		return
 	}
-	isOwner := c.Query("isOwner") == "true"
-	isShared := c.Query("isShared") == "true"
-	zoneUUID := c.Query("zoneUUID")
+	isOwner := c.Query("is_owner") == "true"
+	isShared := c.Query("is_shared") == "true"
+	zoneUUID := c.Query("zone_uuid")
 	service := tenantProvider.GetTenantInfo(tenantCode)
-	zoneResponse, err := service.ZoneService.GetZonesByUser(userId, isOwner, isShared, &zoneUUID)
+	zoneResponse, err := service.ZoneService.GetZonesByUser(userId, isOwner, isShared, zoneUUID)
 	if err != nil {
 		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
 		return
@@ -54,7 +54,8 @@ func ListZones(c *gin.Context) {
 // PUT /zone/:zone_uuid
 func UpdateZone(c *gin.Context) {
 	tenantCode := c.GetString("tenant_code")
-	uuid := c.Param("zone_uuid")
+	userId := c.GetUint("user_id")
+	zoneUUID := c.Param("zone_uuid")
 	if tenantCode == "" {
 		return
 	}
@@ -64,7 +65,7 @@ func UpdateZone(c *gin.Context) {
 		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
 		return
 	}
-	zoneResponse, err := service.ZoneService.UpdateZone(&req, uuid)
+	zoneResponse, err := service.ZoneService.UpdateZone(&req, zoneUUID, userId)
 	if err != nil {
 		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
 		return
@@ -75,12 +76,13 @@ func UpdateZone(c *gin.Context) {
 // DELETE /zones/:zone_uuid
 func DeleteZone(c *gin.Context) {
 	tenantCode := c.GetString("tenant_code")
-	uuid := c.Param("uuid")
+	userId := c.GetUint("user_id")
+	zoneUUID := c.Param("zone_uuid")
 	if tenantCode == "" {
 		return
 	}
 	service := tenantProvider.GetTenantInfo(tenantCode)
-	deleted, err := service.ZoneService.DeleteZones(uuid)
+	deleted, err := service.ZoneService.DeleteZones(zoneUUID, userId)
 	if err != nil {
 		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
 		return

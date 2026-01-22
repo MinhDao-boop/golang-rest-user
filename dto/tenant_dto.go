@@ -23,7 +23,7 @@ type UpdateTenantRequest struct {
 }
 
 type TenantResponse struct {
-	ID        uint               `json:"id"`
+	UUID      string             `json:"uuid"`
 	Code      string             `json:"code"`
 	Name      string             `json:"name"`
 	DBHost    string             `json:"db_host"`

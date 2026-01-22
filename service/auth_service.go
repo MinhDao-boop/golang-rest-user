@@ -20,21 +20,21 @@ type AuthService interface {
 	Logout(refreshToken string) error
 }
 
-type authService struct {
+type authServiceImpl struct {
 	userSvc    UserService
 	jwtManager *security.Manager
 	tenantCode string
 }
 
 func NewAuthService(userSvc UserService, jwtManager *security.Manager, tenantCode string) AuthService {
-	return &authService{
+	return &authServiceImpl{
 		userSvc:    userSvc,
 		jwtManager: jwtManager,
 		tenantCode: tenantCode,
 	}
 }
 
-func (s *authService) Register(req dto.CreateUserRequest) (*dto.UserResponse, error) {
+func (s *authServiceImpl) Register(req dto.CreateUserRequest) (*dto.UserResponse, error) {
 	userResponse, err := s.userSvc.Create(req)
 	if err != nil {
 		return nil, err
@@ -42,7 +42,7 @@ func (s *authService) Register(req dto.CreateUserRequest) (*dto.UserResponse, er
 	return userResponse, nil
 }
 
-func (s *authService) Login(req dto.LoginRequest) (map[string]interface{}, error) {
+func (s *authServiceImpl) Login(req dto.LoginRequest) (map[string]interface{}, error) {
 
 	user, err := s.userSvc.GetByUsername(req.Username)
 	if err != nil {
@@ -87,7 +87,7 @@ func hashToken(rToken string) string {
 	return hex.EncodeToString(h[:])
 }
 
-func (s *authService) Refresh(rToken string) (map[string]interface{}, error) {
+func (s *authServiceImpl) Refresh(rToken string) (map[string]interface{}, error) {
 	claims, err := s.jwtManager.ParseToken(rToken)
 
 	if claims == nil {
@@ -131,7 +131,7 @@ func (s *authService) Refresh(rToken string) (map[string]interface{}, error) {
 	}, nil
 }
 
-func (s *authService) Logout(rToken string) error {
+func (s *authServiceImpl) Logout(rToken string) error {
 	claims, err := s.jwtManager.ParseToken(rToken)
 	if claims == nil {
 		return errors.New("invalid token")

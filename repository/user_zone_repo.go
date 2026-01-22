@@ -5,6 +5,7 @@ import (
 	"golang-rest-user/models"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type UserZoneRepo interface {
@@ -12,13 +13,50 @@ type UserZoneRepo interface {
 	UpdatePermission(userID, zoneID uint, permission enums.UserPermission) error
 	Delete(userID, zoneID uint) (int64, error)
 	GetPermission(userID uint, path string) (string, error)
-	GetZoneID(userID uint) (uint, error)
 	GetSharedUser(uint) ([]models.UserZone, error)
 	GetByUserID(uint) ([]models.UserZone, error)
+	CountOwnerPermission(shareUserID uint, paths []string) (int64, error)
+	BatchInsert([]models.UserZone) error
+	GetByUserIdAndZoneId(userID uint, zoneID uint) (*models.UserZone, error)
 }
 
 type userZoneRepoImpl struct {
 	db *gorm.DB
+}
+
+func (r *userZoneRepoImpl) GetByUserIdAndZoneId(userID uint, zoneID uint) (*models.UserZone, error) {
+	var userZone models.UserZone
+	if err := r.db.Model(&models.UserZone{}).
+		Where("user_id = ? AND zone_id = ?", userID, zoneID).First(&userZone).Error; err != nil {
+		return nil, err
+	}
+	return &userZone, nil
+}
+
+func (r *userZoneRepoImpl) BatchInsert(userZones []models.UserZone) error {
+	return r.db.
+		Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "user_id"}, {Name: "zone_uuid"}},
+			DoUpdates: clause.AssignmentColumns([]string{"permission"}),
+		}).
+		Create(userZones).Error
+}
+
+func (r *userZoneRepoImpl) CountOwnerPermission(shareUserID uint, paths []string) (int64, error) {
+	var count int64
+	err := r.db.
+		Model(&models.UserZone{}).
+		Table("user_zones uz").
+		Joins("JOIN zones z on z.id = uz.zone_id").
+		Where("uz.user_id = ?", shareUserID).
+		Where("uz.permission = ?", enums.UserOwner).
+		Scopes(func(db *gorm.DB) *gorm.DB {
+			for _, path := range paths {
+				db = db.Or("? LIKE CONCAT(z.path, '%')", path)
+			}
+			return db
+		}).Distinct("z.id").Count(&count).Error
+	return count, err
 }
 
 func (r *userZoneRepoImpl) GetByUserID(userID uint) (userZones []models.UserZone, err error) {
@@ -27,13 +65,6 @@ func (r *userZoneRepoImpl) GetByUserID(userID uint) (userZones []models.UserZone
 		return nil, err
 	}
 	return userZones, nil
-}
-
-func (r *userZoneRepoImpl) GetZoneID(userID uint) (uint, error) {
-	var userZone models.UserZone
-	err := r.db.Table("user_zones").Where("user_id = ?", userID).First(&userZone).Error
-
-	return userZone.ZoneID, err
 }
 
 func (r *userZoneRepoImpl) GetPermission(userID uint, path string) (string, error) {

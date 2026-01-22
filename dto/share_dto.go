@@ -8,9 +8,9 @@ import (
 )
 
 type ShareDTORequest struct {
-	UserUUID   string               `json:"user_uuid"`
-	ZoneUUID   string               `json:"zone_uuid"`
-	Permission enums.UserPermission `json:"permission"`
+	UserUUID   string               `json:"user_uuid" binding:"required"`
+	ZoneUUIDs  []string             `json:"zone_uuid" binding:"required,min=1"`
+	Permission enums.UserPermission `json:"permission" binding:"required"`
 }
 
 type ShareDTOResponse struct {

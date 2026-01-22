@@ -58,7 +58,7 @@ func (t *TenantInfo) InitService() {
 	zoneRepo := repository.NewZoneRepo(t.db)
 	userZoneRepo := repository.NewUserZoneRepo(t.db)
 	t.ZoneService = service.NewZoneService(zoneRepo, userZoneRepo)
-	t.ShareService = service.NewShareService(userZoneRepo)
+	t.ShareService = service.NewShareService(userZoneRepo, t.UserService, t.ZoneService)
 }
 
 func (t *TenantInfo) Migrate() {
