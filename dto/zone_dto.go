@@ -20,8 +20,8 @@ type ZoneDTOResponse struct {
 	Type      string         `json:"type"`
 	Path      string         `json:"path"`
 	Level     int            `json:"level"`
-	Metadata  datatypes.JSON `Gorm:"type:json"`
-	CreatedAt time.Time      `Gorm:"type:datetime"`
-	UpdatedAt time.Time      `Gorm:"type:datetime"`
+	Metadata  datatypes.JSON `json:"metadata"`
+	CreatedAt time.Time      `json:"created_at"`
+	UpdatedAt time.Time      `json:"updated_at"`
 	ParentID  *uint          `json:"parent_id"`
 }

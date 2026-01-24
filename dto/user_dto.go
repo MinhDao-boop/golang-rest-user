@@ -35,7 +35,7 @@ type UserResponse struct {
 	ID        uint   `json:"id"`
 	UUID      string `json:"uuid"`
 	Username  string `json:"username"`
-	FullName  string `json:"fullname"`
+	FullName  string `json:"full_name"`
 	Phone     string `json:"phone"`
 	Position  string `json:"position"`
 	CreatedAt string `json:"created_at"`

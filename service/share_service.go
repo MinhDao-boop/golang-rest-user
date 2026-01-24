@@ -6,14 +6,10 @@ import (
 	"golang-rest-user/enums"
 	"golang-rest-user/models"
 	"golang-rest-user/repository"
-	"strings"
-	"time"
-
-	"github.com/google/uuid"
 )
 
 type ShareService interface {
-	ShareZone(shareUserID uint, req dto.ShareDTORequest) error
+	ShareZone(shareUserID uint, zoneUUID string, req dto.ShareDTORequest) error
 	RevokeUser(zoneUUID, userUUID string, userID uint) (int64, error)
 	UpdatePermission(zoneUUID, userUUID string, userID uint, req dto.ShareDTORequest) error
 	GetSharedUser(zoneUUID string, userID uint) ([]dto.UserResponse, error)
@@ -60,7 +56,7 @@ func (s *shareServiceImpl) UpdatePermission(zoneUUID, userUUID string, shareUser
 	return s.userZoneRepo.UpdatePermission(user.ID, zone.ID, req.Permission)
 }
 
-func (s *shareServiceImpl) ShareZone(shareUserID uint, req dto.ShareDTORequest) error {
+func (s *shareServiceImpl) ShareZone(shareUserID uint, shareZoneUUID string, req dto.ShareDTORequest) error {
 	if !enums.IsValidUserPermission(req.Permission) {
 		return errors.New("invalid permission")
 	}
@@ -72,54 +68,56 @@ func (s *shareServiceImpl) ShareZone(shareUserID uint, req dto.ShareDTORequest) 
 		return errors.New("invalid sharing")
 	}
 
-	zones, err := s.zoneSvc.GetByUUIDs(req.ZoneUUIDs)
+	shareZone, err := s.zoneSvc.GetByUUID(shareZoneUUID)
 	if err != nil {
 		return err
 	}
-	if len(zones) != len(req.ZoneUUIDs) {
-		return errors.New("some zones not found")
+	if !s.zoneSvc.CheckOwnership(shareZone.Path, shareUserID) {
+		return errors.New("permission denied")
+	}
+	//var userZones []models.UserZone
+	zones, err := s.zoneSvc.GetSubtreeByPath(shareZone.Path)
+	zoneMap := make(map[string]models.Zone)
+	for _, z := range zones {
+		zoneMap[z.UUID] = z
 	}
 
-	for _, z := range zones {
-		curPermission, err := s.userZoneRepo.GetPermission(shareUserID, z.Path)
-		if err != nil || strings.Compare(curPermission, string(enums.UserOwner)) != 0 {
-			return errors.New("permission denied")
-		}
-	}
-
-	// 4. batch insert
-	userZones := make([]models.UserZone, 0, len(zones))
-	now := time.Now()
-
-	for _, z := range zones {
-		if _, err := s.userZoneRepo.GetByUserIdAndZoneId(sharedUser.ID, z.ID); err == nil {
-			continue
-		}
+	if len(req.ZoneUUIDs) == 0 {
 		userZone := models.UserZone{
 			UserID:     sharedUser.ID,
-			ZoneID:     z.ID,
+			ZoneID:     shareZone.ID,
 			Permission: req.Permission,
 		}
-		userZone.UUID = uuid.New().String()
-		userZone.CreatedAt = now
-		userZones = append(userZones, userZone)
+		_ = s.userZoneRepo.Create(&userZone)
 	}
-	if len(userZones) == 0 {
-		return nil
+	for _, zoneUUID := range req.ZoneUUIDs {
+		if _, ok := zoneMap[zoneUUID]; ok {
+			userZone := models.UserZone{
+				UserID:     sharedUser.ID,
+				ZoneID:     zoneMap[zoneUUID].ID,
+				Permission: req.Permission,
+			}
+			_ = s.userZoneRepo.Create(&userZone)
+		}
 	}
-	return s.userZoneRepo.BatchInsert(userZones)
+	return nil
 }
 
-func (s *shareServiceImpl) RevokeUser(zoneUUID, userUUID string, shareUserID uint) (int64, error) {
-	zone, err := s.zoneSvc.GetByUUID(zoneUUID)
+func (s *shareServiceImpl) RevokeUser(shareZoneUUID, sharedUserUUID string, shareUserID uint) (int64, error) {
+	shareZone, err := s.zoneSvc.GetByUUID(shareZoneUUID)
 	if err != nil {
 		return 0, err
 	}
-	if !s.zoneSvc.CheckOwnership(zone.Path, shareUserID) {
+	if !s.zoneSvc.CheckOwnership(shareZone.Path, shareUserID) {
 		return 0, errors.New("permission denied")
 	}
-	user, _ := s.userSvc.GetByUUID(userUUID)
-	return s.userZoneRepo.Delete(user.ID, zone.ID)
+	user, _ := s.userSvc.GetByUUID(sharedUserUUID)
+	var zoneIDs []uint
+	zones, err := s.zoneSvc.GetSubtreeByPath(shareZone.Path)
+	for _, zone := range zones {
+		zoneIDs = append(zoneIDs, zone.ID)
+	}
+	return s.userZoneRepo.Delete(user.ID, zoneIDs)
 }
 
 func (s *shareServiceImpl) convertToShareDTOResponse(userZone *models.UserZone) *dto.ShareDTOResponse {

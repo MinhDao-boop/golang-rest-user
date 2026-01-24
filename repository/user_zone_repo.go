@@ -11,7 +11,7 @@ import (
 type UserZoneRepo interface {
 	Create(*models.UserZone) error
 	UpdatePermission(userID, zoneID uint, permission enums.UserPermission) error
-	Delete(userID, zoneID uint) (int64, error)
+	Delete(userID uint, zoneID []uint) (int64, error)
 	GetPermission(userID uint, path string) (string, error)
 	GetSharedUser(uint) ([]models.UserZone, error)
 	GetByUserID(uint) ([]models.UserZone, error)
@@ -90,7 +90,7 @@ func (r *userZoneRepoImpl) GetSharedUser(zoneID uint) (userZones []models.UserZo
 }
 
 func (r *userZoneRepoImpl) Create(userZone *models.UserZone) error {
-	return r.db.Create(userZone).Error
+	return r.db.Save(userZone).Error
 }
 
 func (r *userZoneRepoImpl) UpdatePermission(userID, zoneID uint, permission enums.UserPermission) error {
@@ -98,8 +98,8 @@ func (r *userZoneRepoImpl) UpdatePermission(userID, zoneID uint, permission enum
 		Update("permission", permission).Error
 }
 
-func (r *userZoneRepoImpl) Delete(userID, zoneID uint) (int64, error) {
-	res := r.db.Unscoped().Where("user_id = ? AND zone_id = ?", userID, zoneID).Delete(&models.UserZone{})
+func (r *userZoneRepoImpl) Delete(userID uint, zoneID []uint) (int64, error) {
+	res := r.db.Unscoped().Where("user_id = ? AND zone_id IN ?", userID, zoneID).Delete(&models.UserZone{})
 	return res.RowsAffected, res.Error
 }
 

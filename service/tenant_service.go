@@ -186,7 +186,7 @@ func (s *tenantServiceImpl) Update(uuid string, req dto.UpdateTenantRequest) (*d
 	}
 	if err := s.repo.Update(tenant); err != nil {
 		go func() {
-			s.callBackFunction(enums.DropTenantConnect, tenant.Code, tenant)
+			s.callBackFunction(enums.DeleteTenantConnect, tenant.Code, tenant)
 		}()
 		return nil, err
 	}

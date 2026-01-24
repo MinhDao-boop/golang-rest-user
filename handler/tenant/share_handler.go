@@ -27,20 +27,21 @@ func GetSharedUsers(c *gin.Context) {
 
 }
 
-// POST /zones/share
+// POST /zones/share/:zone_uuid
 func ShareZone(c *gin.Context) {
 	tenantCode := c.GetString("tenant_code")
 	if tenantCode == "" {
 		return
 	}
 	shareUserID := c.GetUint("user_id")
+	shareZoneUUID := c.Param("zone_uuid")
 	var req = dto.ShareDTORequest{}
 	if err := c.ShouldBind(&req); err != nil {
 		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
 		return
 	}
 	service := tenantProvider.GetTenantInfo(tenantCode)
-	err := service.ShareService.ShareZone(shareUserID, req)
+	err := service.ShareService.ShareZone(shareUserID, shareZoneUUID, req)
 	if err != nil {
 		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
 		return

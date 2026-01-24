@@ -39,7 +39,15 @@ func ZonesRoutes(r *gin.RouterGroup) {
 
 func ShareRoutes(r *gin.RouterGroup) {
 	r.GET("/:zone_uuid", tenant.GetSharedUsers)              // GET /api/v1/zones/share/:zone_uuid
-	r.POST("", tenant.ShareZone)                             // POST /api/v1/zones/share
+	r.POST("/:zone_uuid", tenant.ShareZone)                  // POST /api/v1/zones/share/:zone_uuid
 	r.PUT("/:zone_uuid/:user_uuid", tenant.UpdatePermission) // PUT /api/v1/zones/share/:zone_uuid/:user_uuid
 	r.DELETE("/:zone_uuid/:user_uuid", tenant.RevokeZone)    // DELETE /api/v1/zones/share/:zone_uuid/:user_uuid
+}
+
+func SOSContactRoutes(r *gin.RouterGroup) {
+	r.GET("", tenant.ListSOSContact)                                // GET /api/v1/zones/:zone_uuid/sos-contacts
+	r.POST("", tenant.CreateSOSContact)                             //POST /api/v1/zones/:zone_uuid/sos-contacts
+	r.PATCH("/:contact_uuid", tenant.UpdateSOSContact)              // PATCH /api/v1/zones/:zone_uuid/sos-contacts/:contact_uuid
+	r.PATCH("/:contact_uuid/toggle", tenant.ToggleSOSContactStatus) // PATCH /api/v1/zones/:zone_uuid/sos-contacts/:contact_uuid/toggle
+	r.DELETE("", tenant.DeleteSOSContact)                           //DELETE /api/v1/zones/:zone_uuid/sos-contacts/:contact_uuid
 }

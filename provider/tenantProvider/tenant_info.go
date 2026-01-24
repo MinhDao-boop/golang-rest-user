@@ -20,6 +20,7 @@ type TenantInfo struct {
 	AuthService  service.AuthService
 	ZoneService  service.ZoneService
 	ShareService service.ShareService
+	SOSService   service.SOSContactService
 }
 
 func (t *TenantInfo) Init() error {
@@ -59,6 +60,9 @@ func (t *TenantInfo) InitService() {
 	userZoneRepo := repository.NewUserZoneRepo(t.db)
 	t.ZoneService = service.NewZoneService(zoneRepo, userZoneRepo)
 	t.ShareService = service.NewShareService(userZoneRepo, t.UserService, t.ZoneService)
+
+	sosRepo := repository.NewSOSContactRepo(t.db)
+	t.SOSService = service.NewSOSService(sosRepo, t.ZoneService)
 }
 
 func (t *TenantInfo) Migrate() {
@@ -71,6 +75,7 @@ func (t *TenantInfo) Migrate() {
 		&models.DeviceCredential{},
 		&models.DeviceEvents{},
 		&models.DeviceTelemetry{},
+		&models.SOSContact{},
 	)
 	if err != nil {
 		log.Println(err)

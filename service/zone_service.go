@@ -22,11 +22,21 @@ type ZoneService interface {
 	GetByUUID(uuid string) (*dto.ZoneDTOResponse, error)
 	GetByUUIDs(uuids []string) ([]models.Zone, error)
 	CheckOwnership(path string, userID uint) bool
+	GetSubtreeByPath(path string) ([]models.Zone, error)
 }
 
 type zoneServiceImpl struct {
 	zoneRepo     repository.ZoneRepo
 	userZoneRepo repository.UserZoneRepo
+}
+
+func (s *zoneServiceImpl) GetSubtreeByPath(path string) ([]models.Zone, error) {
+	var zones []models.Zone
+	zones, err := s.zoneRepo.GetSubtreeByPath(path)
+	if err != nil {
+		return nil, err
+	}
+	return zones, nil
 }
 
 func (s *zoneServiceImpl) CheckOwnership(path string, userID uint) bool {
@@ -155,7 +165,6 @@ func (s *zoneServiceImpl) GetZonesByUser(userID uint, isOwner, isShared bool, zo
 	zoneMap := make(map[uint]models.Zone)
 
 	for _, uz := range userZones {
-
 		if isOwner && uz.Permission != enums.UserOwner {
 			continue
 		}
@@ -185,18 +194,15 @@ func (s *zoneServiceImpl) GetZonesByUser(userID uint, isOwner, isShared bool, zo
 		}
 	}
 
-	// 3. convert map → slice
 	zones := make([]models.Zone, 0, len(zoneMap))
 	for _, z := range zoneMap {
 		zones = append(zones, z)
 	}
 
-	// 4. sort theo level
-	sort.SliceStable(zones, func(i, j int) bool {
-		return zones[i].Level < zones[j].Level
+	sort.Slice(zones, func(i, j int) bool {
+		return zones[i].Path < zones[j].Path
 	})
 
-	// 5. convert DTO
 	res := make([]dto.ZoneDTOResponse, 0, len(zones))
 	for _, z := range zones {
 		res = append(res, *s.convertToZoneDTOResponse(&z))

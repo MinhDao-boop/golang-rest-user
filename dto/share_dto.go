@@ -3,8 +3,6 @@ package dto
 import (
 	"golang-rest-user/enums"
 	"time"
-
-	"gorm.io/gorm"
 )
 
 type ShareDTORequest struct {
@@ -20,5 +18,4 @@ type ShareDTOResponse struct {
 	Permission enums.UserPermission `json:"permission"`
 	CreatedAt  time.Time            `json:"created_at"`
 	UpdatedAt  time.Time            `json:"updated_at"`
-	DeletedAt  gorm.DeletedAt       `Gorm:"index" json:"-"`
 }
