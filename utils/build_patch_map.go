@@ -10,9 +10,11 @@ func BuildPatchMap(req any) map[string]interface{} {
 
 	for i := 0; i < v.NumField(); i++ {
 		field := v.Field(i)
+		if field.Kind() != reflect.Ptr || field.IsNil() {
+			continue
+		}
 		tag := t.Field(i).Tag.Get("patch")
-
-		if tag != "true" || field.IsNil() {
+		if tag != "true" {
 			continue
 		}
 

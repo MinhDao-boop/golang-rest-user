@@ -92,9 +92,9 @@ func (s *SOSContactServiceImpl) Update(req dto.UpdateSOSContactRequest, uuid str
 	if len(updates) == 0 {
 		return s.convertToDTO(contact), nil
 	}
-	if value, ok := updates["value"]; ok {
+	if value, ok := updates["name"]; ok {
 		if strings.TrimSpace(value.(string)) == "" {
-			return nil, errors.New("value is required")
+			return nil, errors.New("name is required")
 		}
 	}
 	if value, ok := updates["position"]; ok {
