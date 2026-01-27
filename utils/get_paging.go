@@ -8,7 +8,7 @@ import (
 
 func GetPageAndPageSize(c *gin.Context) (int, int) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "10"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "50"))
 	if page <= 0 {
 		page = 1
 	}

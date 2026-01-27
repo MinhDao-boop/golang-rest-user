@@ -10,14 +10,43 @@ import (
 type SOSContactRepo interface {
 	Create(*models.SOSContact) error
 	Update(string, map[string]interface{}) error
-	ListPaging(zoneId uint, page, pageSize int, search string) ([]models.SOSContact, int64, error)
-	DeleteByUUIDs([]string, uint) (int64, error)
+	ListByZone(zoneId uint, page, pageSize int, search string, isAll bool, isActive *bool) ([]models.SOSContact, int64, error)
+	DeleteByIds([]uint) (int64, error)
 	GetByUUID(string) (*models.SOSContact, error)
 	GetByPhone(interface{}) (*models.SOSContact, error)
 }
 
 type SOSContactRepoImpl struct {
 	db *gorm.DB
+}
+
+func (r *SOSContactRepoImpl) ListByZone(zoneId uint, page, pageSize int, search string, isAll bool, isActive *bool) ([]models.SOSContact, int64, error) {
+	var (
+		sosContacts []models.SOSContact
+		total       int64
+	)
+	query := r.db.
+		Model(&models.SOSContact{}).
+		Joins("JOIN zone_sos zs ON zs.sos_contact_id = sos_contacts.id").
+		Where("zs.zone_id = ?", zoneId).
+		Where("(name LIKE ? OR phone LIKE ?)", "%"+search+"%", "%"+search+"%")
+	if isActive != nil {
+		query.Where("sos_contacts.is_active = ?", *isActive)
+	}
+	if !isAll {
+		if err := query.Count(&total).Error; err != nil {
+			return nil, 0, err
+		}
+		offset := (page - 1) * pageSize
+		query = query.Order("sos_contacts.id ASC").Limit(pageSize).Offset(offset)
+	}
+	if err := query.Find(&sosContacts).Error; err != nil {
+		return nil, 0, err
+	}
+	if isAll {
+		total = int64(len(sosContacts))
+	}
+	return sosContacts, total, nil
 }
 
 func (r *SOSContactRepoImpl) ToggleStatus(uuid string, status enums.SOSContactStatus) error {
@@ -49,23 +78,8 @@ func (r *SOSContactRepoImpl) Update(uuid string, updates map[string]interface{})
 		Updates(updates).Error
 }
 
-func (r *SOSContactRepoImpl) ListPaging(zoneId uint, page, pageSize int, search string) (SosEmployees []models.SOSContact, total int64, err error) {
-	offset := (page - 1) * pageSize
-	query := r.db.Model(&models.SOSContact{})
-	query = query.Where("is_active = ?", enums.ContactActive)
-	query = query.Where("zone_id = ?", zoneId)
-	query = query.Where("name LIKE ? OR phone LIKE ?", "%"+search+"%", "%"+search+"%")
-	if err = query.Count(&total).Error; err != nil {
-		return nil, 0, err
-	}
-	if err = query.Order("id ASC").Offset(offset).Limit(pageSize).Find(&SosEmployees).Error; err != nil {
-		return nil, 0, err
-	}
-	return SosEmployees, total, nil
-}
-
-func (r *SOSContactRepoImpl) DeleteByUUIDs(uuid []string, zoneId uint) (int64, error) {
-	res := r.db.Unscoped().Where("uuid IN (?) AND zone_id = ?", uuid, zoneId).Delete(&models.SOSContact{})
+func (r *SOSContactRepoImpl) DeleteByIds(ids []uint) (int64, error) {
+	res := r.db.Unscoped().Delete(&models.SOSContact{}, ids)
 	return res.RowsAffected, res.Error
 }
 

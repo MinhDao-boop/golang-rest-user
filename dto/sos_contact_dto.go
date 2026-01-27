@@ -6,17 +6,17 @@ import (
 )
 
 type CreateSOSContactRequest struct {
-	Name     string `json:"name" binding:"required"`
-	Position string `json:"position" binding:"required"`
-	Phone    string `json:"phone" binding:"required"`
-	Note     string `json:"note"`
+	Name  string           `json:"name" binding:"required"`
+	Role  enums.SosRoleKey `json:"role" binding:"required"`
+	Phone string           `json:"phone" binding:"required"`
+	Note  string           `json:"note"`
 }
 
 type UpdateSOSContactRequest struct {
-	Name     *string `json:"name" patch:"true"`
-	Position *string `json:"position" patch:"true"`
-	Phone    *string `json:"phone" patch:"true"`
-	Note     *string `json:"note" patch:"true"`
+	Name  *string           `json:"name" binding:"required" patch:"true"`
+	Role  *enums.SosRoleKey `json:"role" binding:"required" patch:"true"`
+	Phone *string           `json:"phone" binding:"required" patch:"true"`
+	Note  *string           `json:"note" patch:"true"`
 }
 
 type ToggleSOSContactRequest struct {
@@ -24,14 +24,14 @@ type ToggleSOSContactRequest struct {
 }
 
 type DeleteSOSContactRequest struct {
-	UUID []string `json:"uuid"`
+	Ids []uint `json:"ids"`
 }
 
 type SOSContactResponse struct {
 	ID        uint                   `json:"id"`
 	UUID      string                 `json:"uuid"`
 	Name      string                 `json:"name"`
-	Position  string                 `json:"position"`
+	Role      enums.SosRoleKey       `json:"role"`
 	Phone     string                 `json:"phone"`
 	Note      string                 `json:"note"`
 	IsActive  enums.SOSContactStatus `json:"is_active"`

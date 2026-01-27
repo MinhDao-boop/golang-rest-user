@@ -7,7 +7,6 @@ import (
 	"golang-rest-user/models"
 	"golang-rest-user/repository"
 	"golang-rest-user/utils"
-	"regexp"
 	"strings"
 	"time"
 
@@ -16,7 +15,7 @@ import (
 
 type SOSContactService interface {
 	Create(req dto.CreateSOSContactRequest, zoneUuid string) (*dto.SOSContactResponse, error)
-	ListPaging(zoneUuid string, page, pageSize int, search string) ([]dto.SOSContactResponse, int64, error)
+	ListByZone(zoneUuid string, page, pageSize int, search string, isAll bool, isActive *bool) ([]dto.SOSContactResponse, int64, error)
 	Update(req dto.UpdateSOSContactRequest, uuid string) (*dto.SOSContactResponse, error)
 	ToggleStatus(req dto.ToggleSOSContactRequest, uuid string) (*dto.SOSContactResponse, error)
 	DeleteMany(req dto.DeleteSOSContactRequest, zoneUuid string) (int64, error)
@@ -25,26 +24,17 @@ type SOSContactService interface {
 
 type SOSContactServiceImpl struct {
 	sosContactRepo repository.SOSContactRepo
+	zoneSOSRepo    repository.ZoneSOSRepo
 	zoneSvc        ZoneService
 }
 
-var phoneRegex = regexp.MustCompile("^(?:0|(?:\\+[1-9]))\\d{7,14}$")
-
 func (s *SOSContactServiceImpl) Create(req dto.CreateSOSContactRequest, zoneUuid string) (*dto.SOSContactResponse, error) {
-	if req.Name == "" {
-		return nil, errors.New("name is required")
+	normalizedPhone, err := utils.NormalizePhone(req.Phone)
+	if err != nil {
+		return nil, err
 	}
-	if req.Position == "" {
-		return nil, errors.New("position is required")
-	}
-	if req.Phone == "" {
-		return nil, errors.New("phone number is required")
-	}
-	if !phoneRegex.MatchString(req.Phone) {
-		return nil, errors.New("invalid phone number")
-	}
-	if _, err := s.sosContactRepo.GetByPhone(req.Phone); err == nil {
-		return nil, errors.New("phone number already exists")
+	if !enums.IsValidRoleKey(req.Role) {
+		return nil, errors.New("invalid role")
 	}
 	zone, err := s.zoneSvc.GetByUUID(zoneUuid)
 	if err != nil {
@@ -52,27 +42,35 @@ func (s *SOSContactServiceImpl) Create(req dto.CreateSOSContactRequest, zoneUuid
 	}
 	sosContact := models.SOSContact{
 		Name:     req.Name,
-		Position: req.Position,
-		Phone:    req.Phone,
+		Role:     req.Role,
+		Phone:    normalizedPhone,
 		Note:     req.Note,
 		IsActive: enums.ContactActive,
-		ZoneID:   &zone.ID,
 	}
 	sosContact.UUID = uuid.New().String()
 	sosContact.CreatedAt = time.Now()
 	if err := s.sosContactRepo.Create(&sosContact); err != nil {
 		return nil, err
 	}
+	mapping := &models.ZoneSOS{
+		ZoneID:       zone.ID,
+		SOSContactID: sosContact.ID,
+	}
+	mapping.UUID = uuid.New().String()
+	mapping.CreatedAt = time.Now()
+	if err := s.zoneSOSRepo.Create(mapping); err != nil {
+		return nil, err
+	}
 	return s.convertToDTO(&sosContact), nil
 }
 
-func (s *SOSContactServiceImpl) ListPaging(zoneUuid string, page, pageSize int, search string) ([]dto.SOSContactResponse, int64, error) {
+func (s *SOSContactServiceImpl) ListByZone(zoneUuid string, page, pageSize int, search string, isAll bool, isActive *bool) ([]dto.SOSContactResponse, int64, error) {
 	zone, err := s.zoneSvc.GetByUUID(zoneUuid)
 	if err != nil {
 		return nil, 0, err
 	}
 	search = strings.TrimSpace(search)
-	contacts, total, err := s.sosContactRepo.ListPaging(zone.ID, page, pageSize, search)
+	contacts, total, err := s.sosContactRepo.ListByZone(zone.ID, page, pageSize, search, isAll, isActive)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -93,32 +91,26 @@ func (s *SOSContactServiceImpl) Update(req dto.UpdateSOSContactRequest, uuid str
 		return s.convertToDTO(contact), nil
 	}
 	if value, ok := updates["name"]; ok {
-		if strings.TrimSpace(value.(string)) == "" {
-			return nil, errors.New("name is required")
-		}
+		contact.Name = value.(string)
 	}
-	if value, ok := updates["position"]; ok {
-		if strings.TrimSpace(value.(string)) == "" {
-			return nil, errors.New("position is required")
+	if value, ok := updates["role"]; ok {
+		role := value.(enums.SosRoleKey)
+		if !enums.IsValidRoleKey(role) {
+			return nil, errors.New("invalid role")
 		}
+		contact.Role = role
 	}
 	if value, ok := updates["phone"]; ok {
-		phone := strings.TrimSpace(value.(string))
-		if phone == "" {
-			return nil, errors.New("phone is required")
+		phoneRaw := value.(string)
+		normalizedPhone, err := utils.NormalizePhone(phoneRaw)
+		if err != nil {
+			return nil, err
 		}
-		if !phoneRegex.MatchString(phone) {
-			return nil, errors.New("invalid phone number")
-		}
-		existed, err := s.sosContactRepo.GetByPhone(phone)
-		if err == nil && existed.UUID != uuid {
-			return nil, errors.New("phone number already exists")
-		}
+		contact.Phone = normalizedPhone
 	}
 	if err = s.sosContactRepo.Update(uuid, updates); err != nil {
 		return nil, err
 	}
-	contact, _ = s.sosContactRepo.GetByUUID(uuid)
 	return s.convertToDTO(contact), nil
 }
 
@@ -149,7 +141,11 @@ func (s *SOSContactServiceImpl) DeleteMany(req dto.DeleteSOSContactRequest, zone
 	if err != nil {
 		return 0, err
 	}
-	return s.sosContactRepo.DeleteByUUIDs(req.UUID, zone.ID)
+	_, err = s.zoneSOSRepo.Delete(req.Ids, zone.ID)
+	if err != nil {
+		return 0, err
+	}
+	return s.sosContactRepo.DeleteByIds(req.Ids)
 }
 
 func (s *SOSContactServiceImpl) convertToDTO(contact *models.SOSContact) *dto.SOSContactResponse {
@@ -157,7 +153,7 @@ func (s *SOSContactServiceImpl) convertToDTO(contact *models.SOSContact) *dto.SO
 		ID:        contact.ID,
 		UUID:      contact.UUID,
 		Name:      contact.Name,
-		Position:  contact.Position,
+		Role:      contact.Role,
 		Phone:     contact.Phone,
 		Note:      contact.Note,
 		IsActive:  contact.IsActive,
@@ -165,6 +161,6 @@ func (s *SOSContactServiceImpl) convertToDTO(contact *models.SOSContact) *dto.SO
 		UpdatedAt: contact.UpdatedAt,
 	}
 }
-func NewSOSService(sosRepo repository.SOSContactRepo, zoneSvc ZoneService) SOSContactService {
-	return &SOSContactServiceImpl{sosContactRepo: sosRepo, zoneSvc: zoneSvc}
+func NewSOSService(sosRepo repository.SOSContactRepo, zoneSOSRepo repository.ZoneSOSRepo, zoneSvc ZoneService) SOSContactService {
+	return &SOSContactServiceImpl{sosContactRepo: sosRepo, zoneSOSRepo: zoneSOSRepo, zoneSvc: zoneSvc}
 }

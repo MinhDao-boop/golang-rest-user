@@ -14,13 +14,13 @@ import (
 )
 
 type TenantInfo struct {
-	Info         *models.Tenant
-	db           *gorm.DB
-	UserService  service.UserService
-	AuthService  service.AuthService
-	ZoneService  service.ZoneService
-	ShareService service.ShareService
-	SOSService   service.SOSContactService
+	Info              *models.Tenant
+	db                *gorm.DB
+	UserService       service.UserService
+	AuthService       service.AuthService
+	ZoneService       service.ZoneService
+	ShareService      service.ShareService
+	SOSContactService service.SOSContactService
 }
 
 func (t *TenantInfo) Init() error {
@@ -61,8 +61,9 @@ func (t *TenantInfo) InitService() {
 	t.ZoneService = service.NewZoneService(zoneRepo, userZoneRepo)
 	t.ShareService = service.NewShareService(userZoneRepo, t.UserService, t.ZoneService)
 
-	sosRepo := repository.NewSOSContactRepo(t.db)
-	t.SOSService = service.NewSOSService(sosRepo, t.ZoneService)
+	sosContactRepo := repository.NewSOSContactRepo(t.db)
+	zoneSOSRepo := repository.NewZoneSOSRepo(t.db)
+	t.SOSContactService = service.NewSOSService(sosContactRepo, zoneSOSRepo, t.ZoneService)
 }
 
 func (t *TenantInfo) Migrate() {
@@ -76,6 +77,7 @@ func (t *TenantInfo) Migrate() {
 		&models.DeviceEvents{},
 		&models.DeviceTelemetry{},
 		&models.SOSContact{},
+		&models.ZoneSOS{},
 	)
 	if err != nil {
 		log.Println(err)

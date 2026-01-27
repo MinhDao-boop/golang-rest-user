@@ -22,12 +22,21 @@ type ZoneService interface {
 	GetByUUID(uuid string) (*dto.ZoneDTOResponse, error)
 	GetByUUIDs(uuids []string) ([]models.Zone, error)
 	CheckOwnership(path string, userID uint) bool
+	IsExisted(userId, zoneId uint) bool
 	GetSubtreeByPath(path string) ([]models.Zone, error)
 }
 
 type zoneServiceImpl struct {
 	zoneRepo     repository.ZoneRepo
 	userZoneRepo repository.UserZoneRepo
+}
+
+func (s *zoneServiceImpl) IsExisted(userId, zoneId uint) bool {
+	_, err := s.userZoneRepo.GetByUserIdAndZoneId(userId, zoneId)
+	if err != nil {
+		return false
+	}
+	return true
 }
 
 func (s *zoneServiceImpl) GetSubtreeByPath(path string) ([]models.Zone, error) {
