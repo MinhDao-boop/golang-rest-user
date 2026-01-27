@@ -18,7 +18,7 @@ type SOSContactService interface {
 	ListByZone(zoneUuid string, page, pageSize int, search string, isAll bool, isActive *bool) ([]dto.SOSContactResponse, int64, error)
 	Update(req dto.UpdateSOSContactRequest, uuid string) (*dto.SOSContactResponse, error)
 	ToggleStatus(req dto.ToggleSOSContactRequest, uuid string) (*dto.SOSContactResponse, error)
-	DeleteMany(req dto.DeleteSOSContactRequest, zoneUuid string) (int64, error)
+	DeleteMany(req dto.DeleteSOSContactRequest) (int64, error)
 	convertToDTO(contact *models.SOSContact) *dto.SOSContactResponse
 }
 
@@ -90,9 +90,13 @@ func (s *SOSContactServiceImpl) Update(req dto.UpdateSOSContactRequest, uuid str
 	if len(updates) == 0 {
 		return s.convertToDTO(contact), nil
 	}
+	//if req.Name != nil {
+	//	contact.Name = *req.Name
+	//}
 	if value, ok := updates["name"]; ok {
 		contact.Name = value.(string)
 	}
+
 	if value, ok := updates["role"]; ok {
 		role := value.(enums.SosRoleKey)
 		if !enums.IsValidRoleKey(role) {
@@ -128,23 +132,15 @@ func (s *SOSContactServiceImpl) ToggleStatus(req dto.ToggleSOSContactRequest, uu
 		if !enums.IsValidStatus(isActive) {
 			return nil, errors.New("invalid status")
 		}
+		contact.IsActive = isActive
 	}
 	if err = s.sosContactRepo.Update(uuid, updates); err != nil {
 		return nil, err
 	}
-	contact, _ = s.sosContactRepo.GetByUUID(uuid)
 	return s.convertToDTO(contact), nil
 }
 
-func (s *SOSContactServiceImpl) DeleteMany(req dto.DeleteSOSContactRequest, zoneUuid string) (int64, error) {
-	zone, err := s.zoneSvc.GetByUUID(zoneUuid)
-	if err != nil {
-		return 0, err
-	}
-	_, err = s.zoneSOSRepo.Delete(req.Ids, zone.ID)
-	if err != nil {
-		return 0, err
-	}
+func (s *SOSContactServiceImpl) DeleteMany(req dto.DeleteSOSContactRequest) (int64, error) {
 	return s.sosContactRepo.DeleteByIds(req.Ids)
 }
 

@@ -131,13 +131,12 @@ func DeleteSOSContact(c *gin.Context) {
 		return
 	}
 	service := tenantProvider.GetTenantInfo(tenantCode)
-	zoneUuid := c.Query("zone_uuid")
 	var req = dto.DeleteSOSContactRequest{}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
 		return
 	}
-	deleted, err := service.SOSContactService.DeleteMany(req, zoneUuid)
+	deleted, err := service.SOSContactService.DeleteMany(req)
 	if err != nil {
 		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
 		return
