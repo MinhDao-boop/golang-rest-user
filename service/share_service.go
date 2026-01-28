@@ -26,7 +26,7 @@ func (s *shareServiceImpl) GetSharedUser(zoneUUID string, shareUserID uint) ([]d
 	if err != nil {
 		return nil, err
 	}
-	if !s.zoneSvc.CheckOwnership(zone.Path, shareUserID) {
+	if !s.zoneSvc.CheckPermission(zone.ID, shareUserID, enums.UserOwner) {
 		return nil, errors.New("permission denied")
 	}
 	var userResponse []dto.UserResponse
@@ -46,7 +46,7 @@ func (s *shareServiceImpl) UpdatePermission(zoneUUID, userUUID string, shareUser
 	if err != nil {
 		return err
 	}
-	if !s.zoneSvc.CheckOwnership(zone.Path, shareUserID) {
+	if !s.zoneSvc.CheckPermission(zone.ID, shareUserID, enums.UserOwner) {
 		return errors.New("permission denied")
 	}
 	user, _ := s.userSvc.GetByUUID(userUUID)
@@ -72,7 +72,7 @@ func (s *shareServiceImpl) ShareZone(shareUserID uint, shareZoneUUID string, req
 	if err != nil {
 		return err
 	}
-	if !s.zoneSvc.CheckOwnership(shareZone.Path, shareUserID) {
+	if !s.zoneSvc.CheckPermission(shareZone.ID, shareUserID, enums.UserEditor) {
 		return errors.New("permission denied")
 	}
 	//var userZones []models.UserZone
@@ -90,16 +90,16 @@ func (s *shareServiceImpl) ShareZone(shareUserID uint, shareZoneUUID string, req
 		}
 		_ = s.userZoneRepo.Create(&userZone)
 	}
-	for _, zoneUUID := range req.ZoneUUIDs {
-		if _, ok := zoneMap[zoneUUID]; ok {
-			userZone := models.UserZone{
-				UserID:     sharedUser.ID,
-				ZoneID:     zoneMap[zoneUUID].ID,
-				Permission: req.Permission,
-			}
-			_ = s.userZoneRepo.Create(&userZone)
-		}
-	}
+	//for _, zoneUUID := range req.ZoneUUIDs {
+	//	if _, ok := zoneMap[zoneUUID]; ok {
+	//		userZone := models.UserZone{
+	//			UserID:     &sharedUser.ID,
+	//			ZoneID:     zoneMap[zoneUUID].ID,
+	//			Permission: req.Permission,
+	//		}
+	//		_ = s.userZoneRepo.Create(&userZone)
+	//	}
+	//}
 	return nil
 }
 
@@ -108,7 +108,7 @@ func (s *shareServiceImpl) RevokeUser(shareZoneUUID, sharedUserUUID string, shar
 	if err != nil {
 		return 0, err
 	}
-	if !s.zoneSvc.CheckOwnership(shareZone.Path, shareUserID) {
+	if !s.zoneSvc.CheckPermission(shareZone.ID, shareUserID, enums.UserOwner) {
 		return 0, errors.New("permission denied")
 	}
 	user, _ := s.userSvc.GetByUUID(sharedUserUUID)

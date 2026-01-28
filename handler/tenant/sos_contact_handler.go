@@ -11,14 +11,18 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// POST /zones/sos-contacts
+// POST /sos-contacts
 func CreateSOSContact(c *gin.Context) {
 	tenantCode := c.GetString("tenant_code")
 	if tenantCode == "" {
 		return
 	}
-	//userId := c.GetUint("user_id")
+	userId := c.GetUint("user_id")
 	zoneUuid := c.Query("zone_uuid")
+	if zoneUuid == "" {
+		response.Error(c, response.CodeBadRequest, "zone id is required", nil, http.StatusBadRequest)
+		return
+	}
 	service := tenantProvider.GetTenantInfo(tenantCode)
 	//raw, _ := c.GetRawData()
 	//log.Println(string(raw))
@@ -27,7 +31,7 @@ func CreateSOSContact(c *gin.Context) {
 		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
 		return
 	}
-	contactResponse, err := service.SOSContactService.Create(req, zoneUuid)
+	contactResponse, err := service.SOSContactService.Create(req, zoneUuid, userId)
 	if err != nil {
 		if strings.Contains(err.Error(), "exists") {
 			response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusConflict)
@@ -39,14 +43,19 @@ func CreateSOSContact(c *gin.Context) {
 	response.Success(c, contactResponse)
 }
 
-// GET /zones/sos-contacts
+// GET /sos-contacts
 func ListSOSContact(c *gin.Context) {
 	tenantCode := c.GetString("tenant_code")
 	if tenantCode == "" {
 		return
 	}
+	userId := c.GetUint("user_id")
 	service := tenantProvider.GetTenantInfo(tenantCode)
 	zoneUuid := c.Query("zone_uuid")
+	if zoneUuid == "" {
+		response.Error(c, response.CodeBadRequest, "zone id is required", nil, http.StatusBadRequest)
+		return
+	}
 	page, pageSize := utils.GetPageAndPageSize(c)
 	search := c.Query("search")
 	isAll := c.Query("is_all") == "true"
@@ -55,40 +64,34 @@ func ListSOSContact(c *gin.Context) {
 		val := value == "true"
 		isActive = &val
 	}
-	contactResponse, total, err := service.SOSContactService.ListByZone(zoneUuid, page, pageSize, search, isAll, isActive)
+	listResponse, err := service.SOSContactService.ListByZone(page, pageSize, search, isAll, isActive, zoneUuid, userId)
 	if err != nil {
 		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusInternalServerError)
 		return
 	}
-	if isAll {
-		response.Success(c, gin.H{
-			"data":  contactResponse,
-			"total": total,
-		})
-		return
-	}
-	response.Success(c, gin.H{
-		"data":     contactResponse,
-		"page":     page,
-		"pageSize": pageSize,
-		"total":    total,
-	})
+	response.Success(c, listResponse)
 }
 
-// PATCH /zones/sos-contacts/:contact_uuid
+// PATCH /sos-contacts/:contact_uuid
 func UpdateSOSContact(c *gin.Context) {
 	tenantCode := c.GetString("tenant_code")
 	if tenantCode == "" {
 		return
 	}
+	userId := c.GetUint("user_id")
 	contactUuid := c.Param("contact_uuid")
+	zoneUuid := c.Query("zone_uuid")
+	if zoneUuid == "" {
+		response.Error(c, response.CodeBadRequest, "zone id is required", nil, http.StatusBadRequest)
+		return
+	}
 	service := tenantProvider.GetTenantInfo(tenantCode)
 	var req = dto.UpdateSOSContactRequest{}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
 		return
 	}
-	contactResponse, err := service.SOSContactService.Update(req, contactUuid)
+	contactResponse, err := service.SOSContactService.Update(req, contactUuid, zoneUuid, userId)
 	if err != nil {
 		if strings.Contains(err.Error(), "exists") {
 			response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusConflict)
@@ -100,10 +103,16 @@ func UpdateSOSContact(c *gin.Context) {
 	response.Success(c, contactResponse)
 }
 
-// PATCH /zones/sos-contacts/:contact_uuid/toggle
+// PATCH /sos-contacts/:contact_uuid/toggle
 func ToggleSOSContactStatus(c *gin.Context) {
 	tenantCode := c.GetString("tenant_code")
 	if tenantCode == "" {
+		return
+	}
+	userId := c.GetUint("user_id")
+	zoneUuid := c.Query("zone_uuid")
+	if zoneUuid == "" {
+		response.Error(c, response.CodeBadRequest, "zone id is required", nil, http.StatusBadRequest)
 		return
 	}
 	service := tenantProvider.GetTenantInfo(tenantCode)
@@ -113,7 +122,7 @@ func ToggleSOSContactStatus(c *gin.Context) {
 		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
 		return
 	}
-	contactResponse, err := service.SOSContactService.ToggleStatus(req, contactUuid)
+	contactResponse, err := service.SOSContactService.ToggleStatus(req, contactUuid, zoneUuid, userId)
 	if err != nil {
 		if strings.Contains(err.Error(), "invalid") {
 			response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusConflict)
@@ -124,10 +133,16 @@ func ToggleSOSContactStatus(c *gin.Context) {
 	response.Success(c, contactResponse)
 }
 
-// DELETE /zones/sos-contacts
+// DELETE /sos-contacts
 func DeleteSOSContact(c *gin.Context) {
 	tenantCode := c.GetString("tenant_code")
 	if tenantCode == "" {
+		return
+	}
+	userId := c.GetUint("user_id")
+	zoneUuid := c.Query("zone_uuid")
+	if zoneUuid == "" {
+		response.Error(c, response.CodeBadRequest, "zone id is required", nil, http.StatusBadRequest)
 		return
 	}
 	service := tenantProvider.GetTenantInfo(tenantCode)
@@ -136,7 +151,7 @@ func DeleteSOSContact(c *gin.Context) {
 		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
 		return
 	}
-	deleted, err := service.SOSContactService.DeleteMany(req)
+	deleted, err := service.SOSContactService.DeleteMany(req, zoneUuid, userId)
 	if err != nil {
 		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
 		return

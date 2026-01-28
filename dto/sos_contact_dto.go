@@ -13,9 +13,9 @@ type CreateSOSContactRequest struct {
 }
 
 type UpdateSOSContactRequest struct {
-	Name  *string           `json:"name" binding:"required" patch:"true"`
-	Role  *enums.SosRoleKey `json:"role" binding:"required" patch:"true"`
-	Phone *string           `json:"phone" binding:"required" patch:"true"`
+	Name  *string           `json:"name" patch:"true"`
+	Role  *enums.SosRoleKey `json:"role" patch:"true"`
+	Phone *string           `json:"phone" patch:"true"`
 	Note  *string           `json:"note" patch:"true"`
 }
 

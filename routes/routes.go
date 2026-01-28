@@ -45,9 +45,9 @@ func ShareRoutes(r *gin.RouterGroup) {
 }
 
 func SOSContactRoutes(r *gin.RouterGroup) {
-	r.GET("", tenant.ListSOSContact)                                // GET /api/v1/zones/sos-contacts
-	r.POST("", tenant.CreateSOSContact)                             // POST /api/v1/zones/sos-contacts
-	r.PATCH("/:contact_uuid", tenant.UpdateSOSContact)              // PATCH /api/v1/zones/sos-contacts/:contact_uuid
-	r.PATCH("/:contact_uuid/toggle", tenant.ToggleSOSContactStatus) // PATCH /api/v1/zones/sos-contacts/:contact_uuid/toggle
-	r.DELETE("", tenant.DeleteSOSContact)                           // DELETE /api/v1/zones/sos-contacts
+	r.GET("", tenant.ListSOSContact)                                // GET /api/v1/sos-contacts
+	r.POST("", tenant.CreateSOSContact)                             // POST /api/v1/sos-contacts
+	r.PATCH("/:contact_uuid", tenant.UpdateSOSContact)              // PATCH /api/v1/sos-contacts/:contact_uuid
+	r.PATCH("/:contact_uuid/toggle", tenant.ToggleSOSContactStatus) // PATCH /api/v1/sos-contacts/:contact_uuid/toggle
+	r.DELETE("", tenant.DeleteSOSContact)                           // DELETE /api/v1/sos-contacts
 }

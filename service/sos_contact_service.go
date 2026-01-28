@@ -14,11 +14,12 @@ import (
 )
 
 type SOSContactService interface {
-	Create(req dto.CreateSOSContactRequest, zoneUuid string) (*dto.SOSContactResponse, error)
-	ListByZone(zoneUuid string, page, pageSize int, search string, isAll bool, isActive *bool) ([]dto.SOSContactResponse, int64, error)
-	Update(req dto.UpdateSOSContactRequest, uuid string) (*dto.SOSContactResponse, error)
-	ToggleStatus(req dto.ToggleSOSContactRequest, uuid string) (*dto.SOSContactResponse, error)
-	DeleteMany(req dto.DeleteSOSContactRequest) (int64, error)
+	Create(req dto.CreateSOSContactRequest, zoneUuid string, userId uint) (*dto.SOSContactResponse, error)
+	ListByZone(page, pageSize int, search string, isAll bool, isActive *bool, zoneUuid string, userId uint) (*dto.ListResponse, error)
+	Update(req dto.UpdateSOSContactRequest, contactUuid, zoneUuid string, userId uint) (*dto.SOSContactResponse, error)
+	ToggleStatus(req dto.ToggleSOSContactRequest, contactUuid, zoneUuid string, userId uint) (*dto.SOSContactResponse, error)
+	DeleteMany(req dto.DeleteSOSContactRequest, zoneUuid string, userId uint) (int64, error)
+	GetByUuid(string) (*dto.SOSContactResponse, error)
 	convertToDTO(contact *models.SOSContact) *dto.SOSContactResponse
 }
 
@@ -28,7 +29,15 @@ type SOSContactServiceImpl struct {
 	zoneSvc        ZoneService
 }
 
-func (s *SOSContactServiceImpl) Create(req dto.CreateSOSContactRequest, zoneUuid string) (*dto.SOSContactResponse, error) {
+func (s *SOSContactServiceImpl) GetByUuid(contactUuid string) (*dto.SOSContactResponse, error) {
+	contact, err := s.sosContactRepo.GetByUUID(contactUuid)
+	if err != nil {
+		return nil, err
+	}
+	return s.convertToDTO(contact), nil
+}
+
+func (s *SOSContactServiceImpl) Create(req dto.CreateSOSContactRequest, zoneUuid string, userId uint) (*dto.SOSContactResponse, error) {
 	normalizedPhone, err := utils.NormalizePhone(req.Phone)
 	if err != nil {
 		return nil, err
@@ -39,6 +48,9 @@ func (s *SOSContactServiceImpl) Create(req dto.CreateSOSContactRequest, zoneUuid
 	zone, err := s.zoneSvc.GetByUUID(zoneUuid)
 	if err != nil {
 		return nil, err
+	}
+	if !s.zoneSvc.CheckPermission(zone.ID, userId, enums.UserEditor) {
+		return nil, errors.New("permission denied")
 	}
 	sosContact := models.SOSContact{
 		Name:     req.Name,
@@ -64,83 +76,117 @@ func (s *SOSContactServiceImpl) Create(req dto.CreateSOSContactRequest, zoneUuid
 	return s.convertToDTO(&sosContact), nil
 }
 
-func (s *SOSContactServiceImpl) ListByZone(zoneUuid string, page, pageSize int, search string, isAll bool, isActive *bool) ([]dto.SOSContactResponse, int64, error) {
+func (s *SOSContactServiceImpl) ListByZone(page, pageSize int, search string, isAll bool, isActive *bool, zoneUuid string, userId uint) (*dto.ListResponse, error) {
+	response := &dto.ListResponse{}
 	zone, err := s.zoneSvc.GetByUUID(zoneUuid)
 	if err != nil {
-		return nil, 0, err
+		return nil, err
+	}
+	if !s.zoneSvc.CheckPermission(zone.ID, userId, enums.UserViewer) {
+		return nil, errors.New("permission denied")
 	}
 	search = strings.TrimSpace(search)
 	contacts, total, err := s.sosContactRepo.ListByZone(zone.ID, page, pageSize, search, isAll, isActive)
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 	var result []dto.SOSContactResponse
 	for _, contact := range contacts {
 		result = append(result, *s.convertToDTO(&contact))
 	}
-	return result, total, nil
+	if isAll {
+		response.Data = result
+		response.Total = total
+		return response, nil
+	}
+	response = &dto.ListResponse{
+		Data:     result,
+		Page:     &page,
+		PageSize: &pageSize,
+		Total:    total,
+	}
+	return response, nil
 }
 
-func (s *SOSContactServiceImpl) Update(req dto.UpdateSOSContactRequest, uuid string) (*dto.SOSContactResponse, error) {
-	contact, err := s.sosContactRepo.GetByUUID(uuid)
+func (s *SOSContactServiceImpl) Update(req dto.UpdateSOSContactRequest, contactUuid, zoneUuid string, userId uint) (*dto.SOSContactResponse, error) {
+	zone, err := s.zoneSvc.GetByUUID(zoneUuid)
 	if err != nil {
 		return nil, err
 	}
-	updates := utils.BuildPatchMap(req)
-	if len(updates) == 0 {
-		return s.convertToDTO(contact), nil
+	contact, err := s.sosContactRepo.GetByUUID(contactUuid)
+	if err != nil {
+		return nil, err
 	}
-	//if req.Name != nil {
-	//	contact.Name = *req.Name
-	//}
-	if value, ok := updates["name"]; ok {
-		contact.Name = value.(string)
+	if !s.zoneSvc.CheckPermission(zone.ID, userId, enums.UserEditor) {
+		return nil, errors.New("permission denied")
 	}
-
-	if value, ok := updates["role"]; ok {
-		role := value.(enums.SosRoleKey)
+	if req.Name != nil {
+		name := *req.Name
+		if name == "" {
+			return nil, errors.New("name is required")
+		}
+		contact.Name = name
+	}
+	if req.Role != nil {
+		role := *req.Role
+		if role == "" {
+			return nil, errors.New("role is required")
+		}
 		if !enums.IsValidRoleKey(role) {
 			return nil, errors.New("invalid role")
 		}
 		contact.Role = role
 	}
-	if value, ok := updates["phone"]; ok {
-		phoneRaw := value.(string)
-		normalizedPhone, err := utils.NormalizePhone(phoneRaw)
+	if req.Phone != nil {
+		phone := *req.Phone
+		if phone == "" {
+			return nil, errors.New("phone is required")
+		}
+		normalizedPhone, err := utils.NormalizePhone(phone)
 		if err != nil {
 			return nil, err
 		}
 		contact.Phone = normalizedPhone
 	}
-	if err = s.sosContactRepo.Update(uuid, updates); err != nil {
+	if err = s.sosContactRepo.Update(contactUuid, contact); err != nil {
 		return nil, err
 	}
 	return s.convertToDTO(contact), nil
 }
 
-func (s *SOSContactServiceImpl) ToggleStatus(req dto.ToggleSOSContactRequest, uuid string) (*dto.SOSContactResponse, error) {
-	contact, err := s.sosContactRepo.GetByUUID(uuid)
+func (s *SOSContactServiceImpl) ToggleStatus(req dto.ToggleSOSContactRequest, contactUuid, zoneUuid string, userId uint) (*dto.SOSContactResponse, error) {
+	zone, err := s.zoneSvc.GetByUUID(zoneUuid)
 	if err != nil {
 		return nil, err
 	}
-	updates := utils.BuildPatchMap(req)
-	if len(updates) == 0 {
-		return s.convertToDTO(contact), nil
+	if !s.zoneSvc.CheckPermission(zone.ID, userId, enums.UserEditor) {
+		return nil, errors.New("permission denied")
 	}
-	if value, ok := updates["is_active"]; ok {
-		isActive := value.(enums.SOSContactStatus)
+	contact, err := s.sosContactRepo.GetByUUID(contactUuid)
+	if err != nil {
+		return nil, err
+	}
+	if req.IsActive != nil {
+		isActive := *req.IsActive
 		if !enums.IsValidStatus(isActive) {
 			return nil, errors.New("invalid status")
 		}
 		contact.IsActive = isActive
 	}
-	if err = s.sosContactRepo.Update(uuid, updates); err != nil {
+	if err = s.sosContactRepo.Update(contactUuid, contact); err != nil {
 		return nil, err
 	}
 	return s.convertToDTO(contact), nil
 }
 
-func (s *SOSContactServiceImpl) DeleteMany(req dto.DeleteSOSContactRequest) (int64, error) {
+func (s *SOSContactServiceImpl) DeleteMany(req dto.DeleteSOSContactRequest, zoneUuid string, userId uint) (int64, error) {
+	zone, err := s.zoneSvc.GetByUUID(zoneUuid)
+	if err != nil {
+		return 0, err
+	}
+	if !s.zoneSvc.CheckPermission(zone.ID, userId, enums.UserEditor) {
+		return 0, errors.New("permission denied")
+	}
 	return s.sosContactRepo.DeleteByIds(req.Ids)
 }
 

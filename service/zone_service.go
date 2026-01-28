@@ -20,9 +20,9 @@ type ZoneService interface {
 	GetZonesByUser(userID uint, isOwner, isShared bool, zoneUUID string) ([]dto.ZoneDTOResponse, error)
 	DeleteZones(uuid string, userID uint) (int64, error)
 	GetByUUID(uuid string) (*dto.ZoneDTOResponse, error)
+	GetById(uint) (*dto.ZoneDTOResponse, error)
 	GetByUUIDs(uuids []string) ([]models.Zone, error)
-	CheckOwnership(path string, userID uint) bool
-	IsExisted(userId, zoneId uint) bool
+	CheckPermission(zoneID, userID uint, requiredPermission enums.UserPermission) bool
 	GetSubtreeByPath(path string) ([]models.Zone, error)
 }
 
@@ -31,12 +31,12 @@ type zoneServiceImpl struct {
 	userZoneRepo repository.UserZoneRepo
 }
 
-func (s *zoneServiceImpl) IsExisted(userId, zoneId uint) bool {
-	_, err := s.userZoneRepo.GetByUserIdAndZoneId(userId, zoneId)
+func (s *zoneServiceImpl) GetById(zoneId uint) (*dto.ZoneDTOResponse, error) {
+	zone, err := s.zoneRepo.GetByID(zoneId)
 	if err != nil {
-		return false
+		return nil, err
 	}
-	return true
+	return s.convertToZoneDTOResponse(zone), nil
 }
 
 func (s *zoneServiceImpl) GetSubtreeByPath(path string) ([]models.Zone, error) {
@@ -48,9 +48,13 @@ func (s *zoneServiceImpl) GetSubtreeByPath(path string) ([]models.Zone, error) {
 	return zones, nil
 }
 
-func (s *zoneServiceImpl) CheckOwnership(path string, userID uint) bool {
-	curPermission, err := s.userZoneRepo.GetPermission(userID, path)
-	if err != nil || strings.Compare(curPermission, string(enums.UserOwner)) != 0 {
+func (s *zoneServiceImpl) CheckPermission(zoneId, userId uint, requiredPermission enums.UserPermission) bool {
+	_, err := s.userZoneRepo.GetUserZone(userId, zoneId)
+	if err != nil {
+		return false
+	}
+	curPermission, err := s.userZoneRepo.GetPermission(userId, zoneId)
+	if err != nil || !enums.HasPermission(enums.UserPermission(*curPermission), requiredPermission) {
 		return false
 	}
 	return true
@@ -77,7 +81,7 @@ func (s *zoneServiceImpl) DeleteZones(uuid string, userID uint) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	if !s.CheckOwnership(zone.Path, userID) {
+	if !s.CheckPermission(zone.ID, userID, enums.UserOwner) {
 		return 0, errors.New("permission denied")
 	}
 	return s.zoneRepo.DeleteByPath(zone.Path)
@@ -92,7 +96,7 @@ func (s *zoneServiceImpl) CreateZone(request *dto.ZoneDTORequest, userID uint) (
 		if err != nil {
 			return nil, err
 		}
-		if !s.CheckOwnership(parentZone.Path, userID) {
+		if !s.CheckPermission(parentZone.ID, userID, enums.UserEditor) {
 			return nil, errors.New("permission denied")
 		}
 		parentPath = parentZone.Path
@@ -138,7 +142,7 @@ func (s *zoneServiceImpl) UpdateZone(request *dto.ZoneDTORequest, uuid string, u
 	if err != nil {
 		return nil, err
 	}
-	if !s.CheckOwnership(zone.Path, userID) {
+	if !s.CheckPermission(zone.ID, userID, enums.UserEditor) {
 		return nil, errors.New("permission denied")
 	}
 	zone.Name = request.Name

@@ -1,11 +1,11 @@
 package enums
 
-type UserPermission string
+type UserPermission uint
 
 const (
-	UserOwner  UserPermission = "owner"
-	UserEditor UserPermission = "editor"
-	UserViewer UserPermission = "viewer"
+	UserViewer UserPermission = iota
+	UserEditor
+	UserOwner
 )
 
 func IsValidUserPermission(permission UserPermission) bool {
@@ -19,4 +19,8 @@ func IsValidUserPermission(permission UserPermission) bool {
 	default:
 		return false
 	}
+}
+
+func HasPermission(userPermission, requiredPermission UserPermission) bool {
+	return userPermission >= requiredPermission
 }

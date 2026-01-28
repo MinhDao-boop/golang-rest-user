@@ -9,7 +9,8 @@ import (
 
 type SOSContactRepo interface {
 	Create(*models.SOSContact) error
-	Update(string, map[string]interface{}) error
+	UpdateMap(string, map[string]interface{}) error
+	Update(string, *models.SOSContact) error
 	ListByZone(zoneId uint, page, pageSize int, search string, isAll bool, isActive *bool) ([]models.SOSContact, int64, error)
 	DeleteByIds([]uint) (int64, error)
 	GetByUUID(string) (*models.SOSContact, error)
@@ -18,6 +19,10 @@ type SOSContactRepo interface {
 
 type SOSContactRepoImpl struct {
 	db *gorm.DB
+}
+
+func (r *SOSContactRepoImpl) Update(uuid string, contact *models.SOSContact) error {
+	return r.db.Where("uuid = ?", uuid).Updates(contact).Error
 }
 
 func (r *SOSContactRepoImpl) ListByZone(zoneId uint, page, pageSize int, search string, isAll bool, isActive *bool) ([]models.SOSContact, int64, error) {
@@ -73,7 +78,7 @@ func (r *SOSContactRepoImpl) Create(sosEmployee *models.SOSContact) error {
 	return r.db.Create(sosEmployee).Error
 }
 
-func (r *SOSContactRepoImpl) Update(uuid string, updates map[string]interface{}) error {
+func (r *SOSContactRepoImpl) UpdateMap(uuid string, updates map[string]interface{}) error {
 	return r.db.Model(&models.SOSContact{}).Where("uuid = ?", uuid).
 		Updates(updates).Error
 }

@@ -36,7 +36,7 @@ func Init(router *gin.Engine) {
 	share.Use(middleware.AuthMiddleware(jwtManager))
 	routes.ShareRoutes(share)
 
-	sosContact := v1.Group("zones/sos-contacts")
+	sosContact := v1.Group("/sos-contacts")
 	sosContact.Use(middleware.AuthMiddleware(jwtManager))
 	routes.SOSContactRoutes(sosContact)
 }

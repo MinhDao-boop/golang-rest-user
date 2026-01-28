@@ -12,19 +12,19 @@ type UserZoneRepo interface {
 	Create(*models.UserZone) error
 	UpdatePermission(userID, zoneID uint, permission enums.UserPermission) error
 	Delete(userID uint, zoneID []uint) (int64, error)
-	GetPermission(userID uint, path string) (string, error)
+	GetPermission(userID, zoneId uint) (*uint, error)
 	GetSharedUser(uint) ([]models.UserZone, error)
 	GetByUserID(uint) ([]models.UserZone, error)
 	CountOwnerPermission(shareUserID uint, paths []string) (int64, error)
 	BatchInsert([]models.UserZone) error
-	GetByUserIdAndZoneId(userID uint, zoneID uint) (*models.UserZone, error)
+	GetUserZone(userID uint, zoneID uint) (*models.UserZone, error)
 }
 
 type userZoneRepoImpl struct {
 	db *gorm.DB
 }
 
-func (r *userZoneRepoImpl) GetByUserIdAndZoneId(userID uint, zoneID uint) (*models.UserZone, error) {
+func (r *userZoneRepoImpl) GetUserZone(userID uint, zoneID uint) (*models.UserZone, error) {
 	var userZone models.UserZone
 	if err := r.db.Model(&models.UserZone{}).
 		Where("user_id = ? AND zone_id = ?", userID, zoneID).First(&userZone).Error; err != nil {
@@ -49,7 +49,7 @@ func (r *userZoneRepoImpl) CountOwnerPermission(shareUserID uint, paths []string
 		Table("user_zones uz").
 		Joins("JOIN zones z on z.id = uz.zone_id").
 		Where("uz.user_id = ?", shareUserID).
-		Where("uz.permission = ?", enums.UserOwner).
+		Where("uz.permission = ?", enums.UserViewer).
 		Scopes(func(db *gorm.DB) *gorm.DB {
 			for _, path := range paths {
 				db = db.Or("? LIKE CONCAT(z.path, '%')", path)
@@ -67,8 +67,14 @@ func (r *userZoneRepoImpl) GetByUserID(userID uint) (userZones []models.UserZone
 	return userZones, nil
 }
 
-func (r *userZoneRepoImpl) GetPermission(userID uint, path string) (string, error) {
-	var permission string
+func (r *userZoneRepoImpl) GetPermission(userID, zoneId uint) (*uint, error) {
+	var (
+		permission *uint
+		path       string
+	)
+	if err := r.db.Model(&models.Zone{}).Select("path").Where("id = ?", zoneId).Scan(&path).Error; err != nil {
+		return nil, err
+	}
 	err := r.db.Table("user_zones uz").
 		Select("uz.permission").
 		Joins("JOIN zones z on uz.zone_id = z.id").
@@ -76,7 +82,7 @@ func (r *userZoneRepoImpl) GetPermission(userID uint, path string) (string, erro
 		Order("z.level DESC").
 		Limit(1).Scan(&permission).Error
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	return permission, nil
 }

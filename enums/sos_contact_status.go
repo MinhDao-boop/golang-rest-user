@@ -3,7 +3,7 @@ package enums
 type SOSContactStatus int
 
 const (
-	ContactInactive = iota
+	ContactInactive SOSContactStatus = iota
 	ContactActive
 )
 
