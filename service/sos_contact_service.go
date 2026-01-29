@@ -42,9 +42,9 @@ func (s *SOSContactServiceImpl) Create(req dto.CreateSOSContactRequest, zoneUuid
 	if err != nil {
 		return nil, err
 	}
-	if !enums.IsValidRoleKey(req.Role) {
-		return nil, errors.New("invalid role")
-	}
+	//if !enums.IsValidRoleKey(req.Role) {
+	//	return nil, errors.New("invalid role")
+	//}
 	zone, err := s.zoneSvc.GetByUUID(zoneUuid)
 	if err != nil {
 		return nil, err
@@ -96,13 +96,15 @@ func (s *SOSContactServiceImpl) ListByZone(page, pageSize int, search string, is
 	}
 	if isAll {
 		response.Data = result
+		response.Page = page
+		response.PageSize = int(total)
 		response.Total = total
 		return response, nil
 	}
 	response = &dto.ListResponse{
 		Data:     result,
-		Page:     &page,
-		PageSize: &pageSize,
+		Page:     page,
+		PageSize: pageSize,
 		Total:    total,
 	}
 	return response, nil
@@ -121,33 +123,24 @@ func (s *SOSContactServiceImpl) Update(req dto.UpdateSOSContactRequest, contactU
 		return nil, errors.New("permission denied")
 	}
 	if req.Name != nil {
-		name := *req.Name
-		if name == "" {
-			return nil, errors.New("name is required")
-		}
-		contact.Name = name
+		contact.Name = *req.Name
 	}
 	if req.Role != nil {
 		role := *req.Role
-		if role == "" {
-			return nil, errors.New("role is required")
-		}
-		if !enums.IsValidRoleKey(role) {
-			return nil, errors.New("invalid role")
-		}
+		//if !enums.IsValidRoleKey(role) {
+		//	return nil, errors.New("invalid role")
+		//}
 		contact.Role = role
 	}
 	if req.Phone != nil {
 		phone := *req.Phone
-		if phone == "" {
-			return nil, errors.New("phone is required")
-		}
 		normalizedPhone, err := utils.NormalizePhone(phone)
 		if err != nil {
 			return nil, err
 		}
 		contact.Phone = normalizedPhone
 	}
+	contact.Note = req.Note
 	if err = s.sosContactRepo.Update(contactUuid, contact); err != nil {
 		return nil, err
 	}

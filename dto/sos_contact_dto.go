@@ -6,17 +6,17 @@ import (
 )
 
 type CreateSOSContactRequest struct {
-	Name  string           `json:"name" binding:"required"`
-	Role  enums.SosRoleKey `json:"role" binding:"required"`
-	Phone string           `json:"phone" binding:"required"`
-	Note  string           `json:"note"`
+	Name  string `json:"name" binding:"required"`
+	Role  string `json:"role" binding:"required"`
+	Phone string `json:"phone" binding:"required"`
+	Note  string `json:"note"`
 }
 
 type UpdateSOSContactRequest struct {
-	Name  *string           `json:"name" patch:"true"`
-	Role  *enums.SosRoleKey `json:"role" patch:"true"`
-	Phone *string           `json:"phone" patch:"true"`
-	Note  *string           `json:"note" patch:"true"`
+	Name  *string `json:"name" binding:"required" patch:"true"`
+	Role  *string `json:"role" binding:"required" patch:"true"`
+	Phone *string `json:"phone" binding:"required" patch:"true"`
+	Note  string  `json:"note" patch:"true"`
 }
 
 type ToggleSOSContactRequest struct {
@@ -31,7 +31,7 @@ type SOSContactResponse struct {
 	ID        uint                   `json:"id"`
 	UUID      string                 `json:"uuid"`
 	Name      string                 `json:"name"`
-	Role      enums.SosRoleKey       `json:"role"`
+	Role      string                 `json:"role"`
 	Phone     string                 `json:"phone"`
 	Note      string                 `json:"note"`
 	IsActive  enums.SOSContactStatus `json:"is_active"`

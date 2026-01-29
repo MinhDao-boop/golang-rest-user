@@ -56,7 +56,7 @@ func (s *authServiceImpl) Login(req dto.LoginRequest) (map[string]interface{}, e
 
 	ver := redisProvider.GetTokenVer(user.ID, s.tenantCode)
 
-	aToken, err := s.jwtManager.GenerateToken(user.ID, user.Username, s.tenantCode, enums.TokenTypeAccess, 900, ver)
+	aToken, err := s.jwtManager.GenerateToken(user.ID, user.Username, s.tenantCode, enums.TokenTypeAccess, 3600, ver)
 	if err != nil {
 		return nil, err
 	}
@@ -113,7 +113,7 @@ func (s *authServiceImpl) Refresh(rToken string) (map[string]interface{}, error)
 		return nil, err
 	}
 
-	newAToken, _ := s.jwtManager.GenerateToken(claims.UserID, claims.Username, claims.TenantCode, enums.TokenTypeAccess, 900, ver)
+	newAToken, _ := s.jwtManager.GenerateToken(claims.UserID, claims.Username, claims.TenantCode, enums.TokenTypeAccess, 3600, ver)
 	newRToken, _ := s.jwtManager.GenerateToken(claims.UserID, claims.Username, claims.TenantCode, enums.TokenTypeRefresh, 604800, ver)
 
 	hash := hashToken(newRToken.Token)

@@ -6,13 +6,9 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/hex"
-	"errors"
+	"golang-rest-user/response"
 	"io"
 	"os"
-)
-
-var (
-	ErrInvalidKey = errors.New("invalid encryption key")
 )
 
 // getKey loads encryption key from ENV
@@ -21,10 +17,10 @@ func getKey() ([]byte, error) {
 
 	key, err := hex.DecodeString(raw)
 	if err != nil {
-		return nil, ErrInvalidKey
+		return nil, response.ErrInvalidKey
 	}
 	if len(key) != 32 {
-		return nil, ErrInvalidKey
+		return nil, response.ErrInvalidKey
 	}
 	return []byte(key), nil
 }
@@ -79,7 +75,7 @@ func AESGCMDecrypt(cipherText string) (string, error) {
 
 	nonceSize := gcm.NonceSize()
 	if len(data) < nonceSize {
-		return "", errors.New("ciphertext too short")
+		return "", response.ErrShortCipher
 	}
 
 	nonce, cipherData := data[:nonceSize], data[nonceSize:]

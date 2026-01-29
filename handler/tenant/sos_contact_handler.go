@@ -66,7 +66,7 @@ func ListSOSContact(c *gin.Context) {
 	}
 	listResponse, err := service.SOSContactService.ListByZone(page, pageSize, search, isAll, isActive, zoneUuid, userId)
 	if err != nil {
-		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusInternalServerError)
+		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
 		return
 	}
 	response.Success(c, listResponse)
