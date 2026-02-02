@@ -1,14 +1,5 @@
 package response
 
-type BaseResponse struct {
-	Code       string      `json:"code"`
-	DebugStack interface{} `json:"debug_stack"`
-	Message    string      `json:"message"`
-	RequestID  string      `json:"request_id"`
-	Response   interface{} `json:"response"`
-	Version    string      `json:"version"`
-}
-
 type Response struct {
 	Err         error
 	Data        interface{}
@@ -18,10 +9,21 @@ type Response struct {
 type EmptyData struct{}
 
 type ListResponse struct {
-	Page     int         `form:"page,default=0" json:"page"`
+	Page     int         `form:"page,default=1" json:"page"`
 	PageSize int         `form:"page_size,default=50" json:"page_size"`
 	Total    int64       `json:"total"`
 	Contents interface{} `form:"contents,default=50" json:"contents"`
+}
+
+type DeleteResponse struct {
+	Deleted int64 `json:"deleted"`
+}
+
+type TokenResponse struct {
+	AccessToken      string `json:"access_token"`
+	AccessExpiresIn  int    `json:"access_expires_in"`
+	RefreshToken     string `json:"refresh_token"`
+	RefreshExpiresIn int    `json:"refresh_expires_in"`
 }
 
 type NumberResponse struct {
@@ -32,6 +34,6 @@ func NewResponse() *Response {
 	return &Response{
 		Err:         nil,
 		Data:        nil,
-		MessageCode: CodeBadRequest,
+		MessageCode: ERR0001,
 	}
 }

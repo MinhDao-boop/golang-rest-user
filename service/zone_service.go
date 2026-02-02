@@ -1,12 +1,12 @@
 package service
 
 import (
-	"errors"
 	"fmt"
 	"golang-rest-user/dto"
 	"golang-rest-user/enums"
 	"golang-rest-user/models"
 	"golang-rest-user/repository"
+	"golang-rest-user/response"
 	"sort"
 	"strings"
 	"time"
@@ -15,10 +15,10 @@ import (
 )
 
 type ZoneService interface {
-	CreateZone(request *dto.ZoneDTORequest, userID uint) (*dto.ZoneDTOResponse, error)
-	UpdateZone(request *dto.ZoneDTORequest, uuid string, userID uint) (*dto.ZoneDTOResponse, error)
-	GetZonesByUser(userID uint, isOwner, isShared bool, zoneUUID string) ([]dto.ZoneDTOResponse, error)
-	DeleteZones(uuid string, userID uint) (int64, error)
+	CreateZone(request *dto.ZoneDTORequest, userID uint) *response.Response
+	UpdateZone(request *dto.ZoneDTORequest, uuid string, userID uint) *response.Response
+	GetZonesByUser(userID uint, isOwner, isShared bool, zoneUUID string) *response.Response
+	DeleteZones(uuid string, userID uint) *response.Response
 	GetByUUID(uuid string) (*dto.ZoneDTOResponse, error)
 	GetById(uint) (*dto.ZoneDTOResponse, error)
 	GetByUUIDs(uuids []string) ([]models.Zone, error)
@@ -76,28 +76,45 @@ func (s *zoneServiceImpl) GetByUUID(uuid string) (*dto.ZoneDTOResponse, error) {
 	return s.convertToZoneDTOResponse(zone), nil
 }
 
-func (s *zoneServiceImpl) DeleteZones(uuid string, userID uint) (int64, error) {
+func (s *zoneServiceImpl) DeleteZones(uuid string, userID uint) *response.Response {
+	newResponse := response.NewResponse()
 	zone, err := s.zoneRepo.GetByUUID(uuid)
 	if err != nil {
-		return 0, err
+		newResponse.Err = err
+		return newResponse
 	}
 	if !s.CheckPermission(zone.ID, userID, enums.UserOwner) {
-		return 0, errors.New("permission denied")
+		newResponse.Err = response.ErrForbidden
+		newResponse.MessageCode = response.FBD0000
+		return newResponse
 	}
-	return s.zoneRepo.DeleteByPath(zone.Path)
+	deleted, err := s.zoneRepo.DeleteByPath(zone.Path)
+	if err != nil {
+		newResponse.Err = err
+		return newResponse
+	}
+	newResponse.Data = &response.DeleteResponse{
+		Deleted: deleted,
+	}
+	newResponse.MessageCode = response.SUS0000
+	return newResponse
 }
 
-func (s *zoneServiceImpl) CreateZone(request *dto.ZoneDTORequest, userID uint) (*dto.ZoneDTOResponse, error) {
+func (s *zoneServiceImpl) CreateZone(request *dto.ZoneDTORequest, userID uint) *response.Response {
+	newResponse := response.NewResponse()
 	var parentPath string
 	var parentLevel int
 	if request.ParentID != nil {
 
 		parentZone, err := s.zoneRepo.GetByID(*request.ParentID)
 		if err != nil {
-			return nil, err
+			newResponse.Err = err
+			return newResponse
 		}
 		if !s.CheckPermission(parentZone.ID, userID, enums.UserEditor) {
-			return nil, errors.New("permission denied")
+			newResponse.Err = response.ErrForbidden
+			newResponse.MessageCode = response.FBD0000
+			return newResponse
 		}
 		parentPath = parentZone.Path
 		parentLevel = parentZone.Level
@@ -112,7 +129,8 @@ func (s *zoneServiceImpl) CreateZone(request *dto.ZoneDTORequest, userID uint) (
 	newZone.UUID = uuid.New().String()
 	newZone.CreatedAt = time.Now()
 	if err := s.zoneRepo.Create(&newZone); err != nil {
-		return nil, err
+		newResponse.Err = err
+		return newResponse
 	}
 
 	if request.ParentID == nil {
@@ -121,7 +139,8 @@ func (s *zoneServiceImpl) CreateZone(request *dto.ZoneDTORequest, userID uint) (
 		newZone.Path = fmt.Sprintf("%s%d/", parentPath, newZone.ID)
 	}
 	if err := s.zoneRepo.UpdateZonePath(newZone.ID, newZone.Path); err != nil {
-		return nil, err
+		newResponse.Err = err
+		return newResponse
 	}
 	if request.ParentID == nil {
 		newUserZone := &models.UserZone{
@@ -132,18 +151,25 @@ func (s *zoneServiceImpl) CreateZone(request *dto.ZoneDTORequest, userID uint) (
 		newUserZone.UUID = uuid.New().String()
 		newUserZone.CreatedAt = time.Now()
 		if err := s.userZoneRepo.Create(newUserZone); err != nil {
-			return nil, err
+			newResponse.Err = err
+			return newResponse
 		}
 	}
-	return s.convertToZoneDTOResponse(&newZone), nil
+	newResponse.Data = s.convertToZoneDTOResponse(&newZone)
+	newResponse.MessageCode = response.SUS0000
+	return newResponse
 }
-func (s *zoneServiceImpl) UpdateZone(request *dto.ZoneDTORequest, uuid string, userID uint) (*dto.ZoneDTOResponse, error) {
+func (s *zoneServiceImpl) UpdateZone(request *dto.ZoneDTORequest, uuid string, userID uint) *response.Response {
+	newResponse := response.NewResponse()
 	zone, err := s.zoneRepo.GetByUUID(uuid)
 	if err != nil {
-		return nil, err
+		newResponse.Err = err
+		return newResponse
 	}
 	if !s.CheckPermission(zone.ID, userID, enums.UserEditor) {
-		return nil, errors.New("permission denied")
+		newResponse.Err = response.ErrForbidden
+		newResponse.MessageCode = response.FBD0000
+		return newResponse
 	}
 	zone.Name = request.Name
 	zone.Type = request.Type
@@ -154,25 +180,31 @@ func (s *zoneServiceImpl) UpdateZone(request *dto.ZoneDTORequest, uuid string, u
 		zone.Path = fmt.Sprintf("%s%d/", parentZone.Path, zone.ID)
 		zone.Level = parentZone.Level + 1
 	}
-	if err := s.zoneRepo.Update(zone); err != nil {
-		return nil, err
+	if err = s.zoneRepo.Update(zone); err != nil {
+		newResponse.Err = err
+		return newResponse
 	}
-	return s.convertToZoneDTOResponse(zone), nil
+	newResponse.Data = s.convertToZoneDTOResponse(zone)
+	newResponse.MessageCode = response.SUS0000
+	return newResponse
 }
 
-func (s *zoneServiceImpl) GetZonesByUser(userID uint, isOwner, isShared bool, zoneUUID string) ([]dto.ZoneDTOResponse, error) {
+func (s *zoneServiceImpl) GetZonesByUser(userID uint, isOwner, isShared bool, zoneUUID string) *response.Response {
+	newResponse := response.NewResponse()
 	var rootPath string
 	if zoneUUID != "" {
 		rootZone, err := s.zoneRepo.GetByUUID(zoneUUID)
 		if err != nil {
-			return nil, err
+			newResponse.Err = err
+			return newResponse
 		}
 		rootPath = rootZone.Path
 	}
 
 	userZones, err := s.userZoneRepo.GetByUserID(userID)
 	if err != nil {
-		return nil, err
+		newResponse.Err = err
+		return newResponse
 	}
 
 	zoneMap := make(map[uint]models.Zone)
@@ -193,7 +225,8 @@ func (s *zoneServiceImpl) GetZonesByUser(userID uint, isOwner, isShared bool, zo
 		// subtree
 		subZones, err := s.zoneRepo.GetSubtreeByPath(zone.Path)
 		if err != nil {
-			return nil, err
+			newResponse.Err = err
+			return newResponse
 		}
 
 		for _, z := range subZones {
@@ -221,9 +254,12 @@ func (s *zoneServiceImpl) GetZonesByUser(userID uint, isOwner, isShared bool, zo
 		res = append(res, *s.convertToZoneDTOResponse(&z))
 	}
 	if len(res) == 0 {
-		return nil, nil
+		newResponse.MessageCode = response.SUS0000
+		return newResponse
 	}
-	return res, nil
+	newResponse.Data = res
+	newResponse.MessageCode = response.SUS0000
+	return newResponse
 }
 
 func NewZoneService(zoneRepo repository.ZoneRepo, userZoneRepo repository.UserZoneRepo) ZoneService {

@@ -8,6 +8,12 @@ type CreateUserRequest struct {
 	Position string `json:"position" binding:"omitempty"`
 }
 
+type ListUsersRequest struct {
+	Page     int    `form:"page,default=1"`
+	PageSize int    `form:"pageSize,default=50"`
+	Search   string `form:"search"`
+}
+
 type DeleteUserRequest struct {
 	UUIDs string `json:"uuid" binding:"omitempty"`
 }

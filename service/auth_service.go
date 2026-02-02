@@ -3,9 +3,9 @@ package service
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"errors"
 	"golang-rest-user/enums"
 	"golang-rest-user/provider/redisProvider"
+	"golang-rest-user/response"
 	"golang-rest-user/utils"
 	"time"
 
@@ -14,10 +14,10 @@ import (
 )
 
 type AuthService interface {
-	Register(req dto.CreateUserRequest) (*dto.UserResponse, error)
-	Login(req dto.LoginRequest) (map[string]interface{}, error)
-	Refresh(refreshToken string) (map[string]interface{}, error)
-	Logout(refreshToken string) error
+	Register(req dto.CreateUserRequest) *response.Response
+	Login(req dto.LoginRequest) *response.Response
+	Refresh(refreshToken string) *response.Response
+	Logout(refreshToken string) *response.Response
 }
 
 type authServiceImpl struct {
@@ -34,52 +34,56 @@ func NewAuthService(userSvc UserService, jwtManager *security.Manager, tenantCod
 	}
 }
 
-func (s *authServiceImpl) Register(req dto.CreateUserRequest) (*dto.UserResponse, error) {
-	userResponse, err := s.userSvc.Create(req)
-	if err != nil {
-		return nil, err
-	}
-	return userResponse, nil
+func (s *authServiceImpl) Register(req dto.CreateUserRequest) *response.Response {
+	return s.userSvc.Create(req)
 }
 
-func (s *authServiceImpl) Login(req dto.LoginRequest) (map[string]interface{}, error) {
-
+func (s *authServiceImpl) Login(req dto.LoginRequest) *response.Response {
+	newResponse := response.NewResponse()
 	user, err := s.userSvc.GetByUsername(req.Username)
 	if err != nil {
-		return nil, errors.New("invalid credentials")
+		newResponse.Err = response.ErrFailedAuthentication
+		newResponse.MessageCode = response.AUT0003
+		return newResponse
 	}
 
 	decryptedPass, _ := utils.AESGCMDecrypt(user.Password)
 	if decryptedPass != req.Password {
-		return nil, errors.New("invalid credentials")
+		newResponse.Err = response.ErrFailedAuthentication
+		newResponse.MessageCode = response.AUT0003
+		return newResponse
 	}
 
 	ver := redisProvider.GetTokenVer(user.ID, s.tenantCode)
 
-	aToken, err := s.jwtManager.GenerateToken(user.ID, user.Username, s.tenantCode, enums.TokenTypeAccess, 3600, ver)
+	accessToken, err := s.jwtManager.GenerateToken(user.ID, user.Username, s.tenantCode, enums.TokenTypeAccess, 3600, ver)
 	if err != nil {
-		return nil, err
+		newResponse.Err = err
+		return newResponse
 	}
 
-	rToken, err := s.jwtManager.GenerateToken(user.ID, user.Username, s.tenantCode, enums.TokenTypeRefresh, 604800, ver)
+	refreshToken, err := s.jwtManager.GenerateToken(user.ID, user.Username, s.tenantCode, enums.TokenTypeRefresh, 604800, ver)
 	if err != nil {
-		return nil, err
+		newResponse.Err = err
+		return newResponse
 	}
 
-	hash := hashToken(rToken.Token)
-	ttl := time.Duration(rToken.ExpiresIn) * time.Second
+	hash := hashToken(refreshToken.Token)
+	ttl := time.Duration(refreshToken.ExpiresIn) * time.Second
 
 	err = redisProvider.Create(hash, user.ID, s.tenantCode, ttl)
 	if err != nil {
-		return nil, err
+		newResponse.Err = err
+		return newResponse
 	}
-
-	return map[string]interface{}{
-		"access_token":       aToken.Token,
-		"access_expires_in":  aToken.ExpiresIn,
-		"refresh_token":      rToken.Token,
-		"refresh_expires_in": rToken.ExpiresIn,
-	}, nil
+	newResponse.Data = &response.TokenResponse{
+		AccessToken:      accessToken.Token,
+		AccessExpiresIn:  accessToken.ExpiresIn,
+		RefreshToken:     refreshToken.Token,
+		RefreshExpiresIn: refreshToken.ExpiresIn,
+	}
+	newResponse.MessageCode = response.SUS0000
+	return newResponse
 }
 
 func hashToken(rToken string) string {
@@ -87,65 +91,84 @@ func hashToken(rToken string) string {
 	return hex.EncodeToString(h[:])
 }
 
-func (s *authServiceImpl) Refresh(rToken string) (map[string]interface{}, error) {
+func (s *authServiceImpl) Refresh(rToken string) *response.Response {
+	newResponse := response.NewResponse()
 	claims, err := s.jwtManager.ParseToken(rToken)
 
 	if claims == nil {
-		return nil, errors.New("invalid token")
+		newResponse.Err = response.ErrInvalidToken
+		return newResponse
 	}
 
 	if err != nil || claims.Type != enums.TokenTypeRefresh {
-		return nil, errors.New("invalid refresh token")
+		newResponse.Err = response.ErrInvalidToken
+		return newResponse
 	}
 
 	if s.tenantCode != claims.TenantCode {
-		return nil, errors.New("invalid tenant code")
+		newResponse.Err = response.ErrInvalidToken
+		return newResponse
 	}
 
-	if err := redisProvider.FindValidByHash(hashToken(rToken), claims.TenantCode, claims.UserID); err != nil {
-		return nil, errors.New("refresh token revoked")
+	if err = redisProvider.FindValidByHash(hashToken(rToken), claims.TenantCode, claims.UserID); err != nil {
+		newResponse.Err = err
+		return newResponse
 	}
 
 	ver := redisProvider.GetTokenVer(claims.UserID, claims.TenantCode)
 
 	//revoke old refresh token
 	if err = redisProvider.Revoke(hashToken(rToken), claims.TenantCode, claims.UserID); err != nil {
-		return nil, err
+		newResponse.Err = err
+		return newResponse
 	}
 
-	newAToken, _ := s.jwtManager.GenerateToken(claims.UserID, claims.Username, claims.TenantCode, enums.TokenTypeAccess, 3600, ver)
-	newRToken, _ := s.jwtManager.GenerateToken(claims.UserID, claims.Username, claims.TenantCode, enums.TokenTypeRefresh, 604800, ver)
+	newAccessToken, _ := s.jwtManager.GenerateToken(claims.UserID, claims.Username, claims.TenantCode, enums.TokenTypeAccess, 3600, ver)
+	newRefreshToken, _ := s.jwtManager.GenerateToken(claims.UserID, claims.Username, claims.TenantCode, enums.TokenTypeRefresh, 604800, ver)
 
-	hash := hashToken(newRToken.Token)
-	ttl := time.Duration(newRToken.ExpiresIn) * time.Second
+	hash := hashToken(newRefreshToken.Token)
+	ttl := time.Duration(newRefreshToken.ExpiresIn) * time.Second
 
 	if err = redisProvider.Create(hash, claims.UserID, claims.TenantCode, ttl); err != nil {
-		return nil, err
+		newResponse.Err = err
+		return newResponse
 	}
-
-	return map[string]interface{}{
-		"access_token":       newAToken.Token,
-		"access_expires_in":  newAToken.ExpiresIn,
-		"refresh_token":      newRToken.Token,
-		"refresh_expires_in": newRToken.ExpiresIn,
-	}, nil
+	newResponse.Data = &response.TokenResponse{
+		AccessToken:      newAccessToken.Token,
+		AccessExpiresIn:  newAccessToken.ExpiresIn,
+		RefreshToken:     newRefreshToken.Token,
+		RefreshExpiresIn: newRefreshToken.ExpiresIn,
+	}
+	newResponse.MessageCode = response.SUS0000
+	return newResponse
 }
 
-func (s *authServiceImpl) Logout(rToken string) error {
+func (s *authServiceImpl) Logout(rToken string) *response.Response {
+	newResponse := response.NewResponse()
 	claims, err := s.jwtManager.ParseToken(rToken)
 	if claims == nil {
-		return errors.New("invalid token")
+		newResponse.Err = response.ErrInvalidToken
+		return newResponse
 	}
 	if err != nil || claims.Type != enums.TokenTypeRefresh {
-		return errors.New("invalid refresh token")
+		newResponse.Err = response.ErrInvalidToken
+		return newResponse
 	}
 	if s.tenantCode != claims.TenantCode {
-		return errors.New("invalid tenant code")
+		newResponse.Err = response.ErrInvalidToken
+		return newResponse
 	}
 
-	if err := redisProvider.IncreaseTokenVer(claims.UserID, claims.TenantCode); err != nil {
-		return err
+	if err = redisProvider.IncreaseTokenVer(claims.UserID, claims.TenantCode); err != nil {
+		newResponse.Err = err
+		return newResponse
 	}
 
-	return redisProvider.RevokeAllByUser(claims.TenantCode, claims.UserID)
+	if err = redisProvider.RevokeAllByUser(claims.TenantCode, claims.UserID); err != nil {
+		newResponse.Err = err
+		return newResponse
+	}
+	newResponse.Data = map[string]string{"message": "logged out"}
+	newResponse.MessageCode = response.SUS0000
+	return newResponse
 }

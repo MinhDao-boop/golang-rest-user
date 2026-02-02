@@ -4,7 +4,6 @@ import (
 	"golang-rest-user/dto"
 	"golang-rest-user/provider/tenantProvider"
 	"golang-rest-user/response"
-	"net/http"
 
 	"github.com/gin-gonic/gin"
 )
@@ -18,13 +17,8 @@ func GetSharedUsers(c *gin.Context) {
 	userID := c.GetUint("user_id")
 	zoneUUID := c.Param("zone_uuid")
 	service := tenantProvider.GetTenantInfo(tenantCode)
-	userResponse, err := service.ShareService.GetSharedUser(zoneUUID, userID)
-	if err != nil {
-		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusInternalServerError)
-		return
-	}
-	response.Success(c, userResponse)
-
+	userResponse := service.ShareService.GetSharedUser(zoneUUID, userID)
+	response.Data(c, userResponse)
 }
 
 // POST /zones/share/:zone_uuid
@@ -37,16 +31,12 @@ func ShareZone(c *gin.Context) {
 	shareZoneUUID := c.Param("zone_uuid")
 	var req = dto.ShareDTORequest{}
 	if err := c.ShouldBind(&req); err != nil {
-		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
+		response.Error(c, response.VAD0000, err)
 		return
 	}
 	service := tenantProvider.GetTenantInfo(tenantCode)
-	err := service.ShareService.ShareZone(shareUserID, shareZoneUUID, req)
-	if err != nil {
-		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
-		return
-	}
-	response.Success(c, nil)
+	shareResponse := service.ShareService.ShareZone(shareUserID, shareZoneUUID, req)
+	response.Data(c, shareResponse)
 }
 
 // PUT /zones/share/:zone_uuid/:user_uuid
@@ -61,14 +51,11 @@ func UpdatePermission(c *gin.Context) {
 	service := tenantProvider.GetTenantInfo(tenantCode)
 	var req = dto.ShareDTORequest{}
 	if err := c.ShouldBind(&req); err != nil {
-		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
+		response.Error(c, response.VAD0000, err)
 		return
 	}
-	if err := service.ShareService.UpdatePermission(zoneUUID, userUUID, userID, req); err != nil {
-		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
-		return
-	}
-	response.Success(c, nil)
+	shareResponse := service.ShareService.UpdatePermission(zoneUUID, userUUID, userID, req)
+	response.Data(c, shareResponse)
 }
 
 // DELETE /zones/share/:zone_uuid/:user_uuid
@@ -81,10 +68,6 @@ func RevokeZone(c *gin.Context) {
 	zoneUUID := c.Param("zone_uuid")
 	userUUID := c.Param("user_uuid")
 	service := tenantProvider.GetTenantInfo(tenantCode)
-	total, err := service.ShareService.RevokeUser(zoneUUID, userUUID, userID)
-	if err != nil {
-		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
-		return
-	}
-	response.Success(c, gin.H{"deleted": total})
+	shareResponse := service.ShareService.RevokeUser(zoneUUID, userUUID, userID)
+	response.Data(c, shareResponse)
 }

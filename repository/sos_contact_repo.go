@@ -3,6 +3,7 @@ package repository
 import (
 	"golang-rest-user/enums"
 	"golang-rest-user/models"
+	"golang-rest-user/utils"
 
 	"gorm.io/gorm"
 )
@@ -42,8 +43,7 @@ func (r *SOSContactRepoImpl) ListByZone(zoneId uint, page, pageSize int, search 
 		if err := query.Count(&total).Error; err != nil {
 			return nil, 0, err
 		}
-		offset := (page - 1) * pageSize
-		query = query.Order("sos_contacts.id ASC").Limit(pageSize).Offset(offset)
+		query = query.Scopes(utils.PaginateGORM(page, pageSize))
 	}
 	if err := query.Find(&sosContacts).Error; err != nil {
 		return nil, 0, err

@@ -1,7 +1,7 @@
 package service
 
 import (
-	"fmt"
+	"golang-rest-user/response"
 	"golang-rest-user/utils"
 	"strings"
 	"time"
@@ -14,11 +14,11 @@ import (
 )
 
 type UserService interface {
-	Create(dto.CreateUserRequest) (*dto.UserResponse, error)
+	Create(dto.CreateUserRequest) *response.Response
 	GetByUUID(string) (*dto.UserResponse, error)
-	List(page, pageSize int, search string) ([]dto.UserResponse, int64, error)
-	Update(uuid string, req dto.UpdateUserRequest) (*dto.UserResponse, error)
-	DeleteMany(dto.DeleteUserRequest) (int64, error)
+	List(request dto.ListUsersRequest) *response.Response
+	Update(uuid string, req dto.UpdateUserRequest) *response.Response
+	DeleteMany(dto.DeleteUserRequest) *response.Response
 	GetByID(uint) (*dto.UserResponse, error)
 	GetByUsername(string) (*models.User, error)
 }
@@ -61,15 +61,18 @@ func (s *userServiceImpl) convertToUserResponse(user *models.User) *dto.UserResp
 	}
 }
 
-func (s *userServiceImpl) Create(req dto.CreateUserRequest) (*dto.UserResponse, error) {
-	// check username existing
+func (s *userServiceImpl) Create(req dto.CreateUserRequest) *response.Response {
+	newResponse := response.NewResponse()
 	if _, err := s.repo.GetByUsername(req.Username); err == nil {
-		return nil, fmt.Errorf("username already exists")
+		newResponse.Err = response.ErrExistingUsername
+		newResponse.MessageCode = response.REG0007
+		return newResponse
 	}
 
 	passEncrypted, err := utils.AESGCMEncrypt(req.Password)
 	if err != nil {
-		return nil, err
+		newResponse.Err = err
+		return newResponse
 	}
 
 	user := &models.User{
@@ -82,10 +85,13 @@ func (s *userServiceImpl) Create(req dto.CreateUserRequest) (*dto.UserResponse, 
 	user.UUID = uuid.New().String()
 	user.CreatedAt = time.Now()
 
-	if err := s.repo.Create(user); err != nil {
-		return nil, err
+	if err = s.repo.Create(user); err != nil {
+		newResponse.Err = err
+		return newResponse
 	}
-	return s.convertToUserResponse(user), nil
+	newResponse.Data = s.convertToUserResponse(user)
+	newResponse.MessageCode = response.SUS0000
+	return newResponse
 }
 
 func (s *userServiceImpl) GetByUUID(uuid string) (*dto.UserResponse, error) {
@@ -96,37 +102,60 @@ func (s *userServiceImpl) GetByUUID(uuid string) (*dto.UserResponse, error) {
 	return s.convertToUserResponse(user), nil
 }
 
-func (s *userServiceImpl) List(page, pageSize int, search string) ([]dto.UserResponse, int64, error) {
-	search = strings.TrimSpace(search)
-	users, total, err := s.repo.GetList(page, pageSize, search)
+func (s *userServiceImpl) List(req dto.ListUsersRequest) *response.Response {
+	newResponse := response.NewResponse()
+	req.Search = strings.TrimSpace(req.Search)
+	users, total, err := s.repo.GetList(req.Page, req.PageSize, req.Search)
 	if err != nil {
-		return nil, 0, err
+		newResponse.Err = err
+		return newResponse
 	}
 	var result []dto.UserResponse
 	for _, u := range users {
 		result = append(result, *s.convertToUserResponse(&u))
 	}
-	return result, total, nil
+	newResponse.Data = &response.ListResponse{
+		Page:     req.Page,
+		PageSize: req.PageSize,
+		Total:    total,
+		Contents: result,
+	}
+	newResponse.MessageCode = response.SUS0000
+	return newResponse
 }
 
-func (s *userServiceImpl) Update(uuid string, req dto.UpdateUserRequest) (*dto.UserResponse, error) {
+func (s *userServiceImpl) Update(uuid string, req dto.UpdateUserRequest) *response.Response {
+	newResponse := response.NewResponse()
 	user, err := s.repo.GetByUUID(uuid)
 	if err != nil {
-		return nil, err
+		newResponse.Err = err
+		return newResponse
 	}
 	user.FullName = req.FullName
 	user.Phone = req.Phone
 	user.Position = req.Position
 	user.UpdatedAt = time.Now().UTC()
 
-	if err := s.repo.Update(user); err != nil {
-		return nil, err
+	if err = s.repo.Update(user); err != nil {
+		newResponse.Err = err
+		return newResponse
 	}
-	return s.convertToUserResponse(user), nil
+	newResponse.MessageCode = response.SUS0000
+	return newResponse
 }
 
-func (s *userServiceImpl) DeleteMany(req dto.DeleteUserRequest) (int64, error) {
+func (s *userServiceImpl) DeleteMany(req dto.DeleteUserRequest) *response.Response {
+	newResponse := response.NewResponse()
 	req.UUIDs = strings.TrimSpace(req.UUIDs)
 	uuids := strings.Split(req.UUIDs, ",")
-	return s.repo.DeleteByUUIDs(uuids)
+	deleted, err := s.repo.DeleteByUUIDs(uuids)
+	if err != nil {
+		newResponse.Err = err
+		return newResponse
+	}
+	newResponse.MessageCode = response.SUS0000
+	newResponse.Data = &response.DeleteResponse{
+		Deleted: deleted,
+	}
+	return newResponse
 }

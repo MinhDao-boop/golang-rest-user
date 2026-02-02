@@ -5,7 +5,6 @@ import (
 	"golang-rest-user/provider/redisProvider"
 	"golang-rest-user/response"
 	"golang-rest-user/security"
-	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -16,7 +15,7 @@ func AuthMiddleware(jwtManager *security.Manager) gin.HandlerFunc {
 		auth := c.GetHeader("Authorization")
 
 		if !strings.HasPrefix(auth, "Bearer ") {
-			response.Error(c, response.CodeBadRequest, "Unauthorized", nil, http.StatusUnauthorized)
+			response.Error(c, response.AUT0006, response.ErrUnauthorized)
 			return
 		}
 
@@ -24,18 +23,18 @@ func AuthMiddleware(jwtManager *security.Manager) gin.HandlerFunc {
 
 		claims, err := jwtManager.ParseToken(tokenStr)
 		if err != nil {
-			response.Error(c, response.CodeBadRequest, "Unauthorized", nil, http.StatusUnauthorized)
+			response.Error(c, response.AUT0006, response.ErrUnauthorized)
 			return
 		}
 
 		if err != nil || claims.Type != enums.TokenTypeAccess {
-			response.Error(c, response.CodeBadRequest, "Invalid access token", nil, http.StatusUnauthorized)
+			response.Error(c, response.ERR0001, response.ErrTokenType)
 			return
 		}
 		tokenVer := claims.Version
 		currentVer := redisProvider.GetTokenVer(claims.UserID, claims.TenantCode)
 		if tokenVer != currentVer {
-			response.Error(c, response.CodeBadRequest, "Unauthorized", nil, http.StatusUnauthorized)
+			response.Error(c, response.AUT0006, response.ErrUnauthorized)
 			return
 		}
 		c.Set("user_id", claims.UserID)

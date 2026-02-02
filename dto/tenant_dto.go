@@ -14,6 +14,12 @@ type CreateTenantRequest struct {
 	DBName string `json:"db_name" binding:"required"`
 }
 
+type ListTenantRequest struct {
+	Page     int    `form:"page,default=1"`
+	PageSize int    `form:"pageSize,default=50"`
+	Search   string `form:"search"`
+}
+
 type UpdateTenantRequest struct {
 	Name   string `json:"name" binding:"omitempty"`
 	DBUser string `json:"db_user" binding:"omitempty"`

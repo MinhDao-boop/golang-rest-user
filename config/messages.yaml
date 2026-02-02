@@ -1,0 +1,141 @@
+messages:
+  vn:
+    AMW0001: "Phiên đăng nhập hết hạn / không tồn tại"
+    AMW0002: "Cần cung cấp thông tin xác thực"
+    AMW0003: "Không tồn tại"
+    TEN0001: "Cần cung cấp thông tin định danh"
+    DEV0001: "Thiết bị không tồn tại"
+    DEV0002: "Thiết bị chưa được bán"
+    DEV0003: "Trạng thái thiết bị không hợp lệ"
+    DEV0004: "Thiết bị đã có trong tài khoản của bạn"
+    DEV0005: "Thiết bị đã thuộc về tài khoản khác"
+    DEV0006: "Thiết bị chưa được gán SIM"
+    DEV0007: "Thiết bị có SIM không hợp lệ"
+    ERR0001: "Có lỗi xảy ra, vui lòng thử lại"
+    ERR0002: "Nội dung truy vấn không hợp lệ"
+    ERR0003: "Hành động không được cung cấp"
+    FBD0000: "Không có quyền truy cập"
+    AUT0000: "Tên đăng nhập đã tồn tại"
+    AUT0001: "Tên đăng nhập không được bỏ trống"
+    AUT0002: "Mật khẩu không được bỏ trống"
+    AUT0003: "Tên đăng nhập hoặc mật khẩu không đúng"
+    AUT0004: "Tên đăng nhập hoặc mật khẩu không đúng"
+    AUT0005: "Đăng nhập thành công"
+    AUT0006: "Không được phép truy cập"
+    REG0001: "Tên đăng nhập không được bỏ trống"
+    REG0002: "Tên đăng nhập dài tối thiểu 8 ký tự và tối đa 15 ký tự"
+    REG0003: "Mật khẩu không được bỏ trống"
+    REG0004: "Mật khẩu dài tối thiểu 8 ký tự và tối đa 15 ký tự"
+    REG0005: "Mật khẩu nhập lại không được bỏ trống"
+    REG0006: "Mật khẩu nhập lại không khớp"
+    REG0007: "Tài khoản đã tồn tại"
+    REG0008: "Mã OTP không được bỏ trống"
+    REG0009: "Thông tin đăng ký không tồn tại"
+    REG0010: "OTP không khớp"
+    REG0012: "Xác thực thành công"
+    SAF0001: "Vùng an toàn không tồn tại"
+    SUS0000: "Thành công"
+    USR0001: "Tài khoản không tồn tại"
+    UZE0001: "Khu vực không tồn tại"
+    VAD0000: "Đầu vào không hợp lệ"
+    VAD0001: "Email không đúng định dạng"
+    VAD0002: "Mật khẩu cũ không được bỏ trống"
+    VAD0003: "Mật khẩu không được bỏ trống"
+    VAD0004: "Xác nhận mật khẩu không được bỏ trống"
+    VAD0005: "Mật khẩu dài tối thiểu 8 ký tự và tối đa 15 ký tự"
+    VAD0006: "Mật khẩu cũ không khớp"
+    VAD0007: "Xác nhận mật khẩu không khớp"
+    VAD0008: "Tên khu vực không được bỏ trống"
+    VAD0009: "Địa chỉ khu vực không được bỏ trống"
+    VAD0010: "Địa chỉ khu vực cấp cao không tồn tại"
+    VAD0011: "Tên vùng an toàn không được bỏ trống"
+    VAD0012: "Phiên xác thực không tồn tại"
+    VAD0013: "Mã OTP không được bỏ trống"
+    VAD0014: "Nội dung bảo dưỡng không được bỏ trống"
+    VAD0015: "Trạng thái bảo dưỡng không được bỏ trống"
+    VAD0016: "Thời gian hết hạn bảo dưỡng không được bỏ trống"
+    VAD0017: "Timezone không được bỏ trống"
+    VAD0018: "Ảnh đại diện không được bỏ trống"
+    VAD0019: "Ảnh đại diện không đúng định dạng"
+    MAT0001: "Thông tin bảo dưỡng không tồn tại"
+    TIA0001: "Khung giờ cảnh báo không tồn tại"
+    VEH0001: "Thông tin xe không tồn tại"
+    FPW0001: "Mã xác thực không khớp"
+  code:
+    AMW0001: 403
+    AMW0002: 403
+    AMW0003: 404
+    TEN0001: 400
+    DEV0001: 404
+    DEV0002: 500
+    DEV0003: 500
+    DEV0004: 500
+    DEV0005: 403
+    DEV0006: 500
+    DEV0007: 500
+    ERR0001: 500
+    ERR0002: 500
+    ERR0003: 400
+    FBD0000: 403
+    AUT0000: 400
+    AUT0001: 400
+    AUT0002: 400
+    AUT0003: 400
+    AUT0004: 400
+    AUT0005: 200
+    AUT0006: 403
+    REG0001: 400
+    REG0002: 400
+    REG0003: 400
+    REG0004: 400
+    REG0005: 400
+    REG0006: 400
+    REG0007: 500
+    REG0008: 400
+    REG0009: 400
+    REG0010: 409
+    REG0012: 200
+    SAF0001: 404
+    SUS0000: 200
+    USR0001: 404
+    UZE0001: 404
+    VAD0000: 400
+    VAD0001: 400
+    VAD0002: 400
+    VAD0003: 400
+    VAD0004: 400
+    VAD0005: 400
+    VAD0006: 401
+    VAD0007: 400
+    VAD0008: 400
+    VAD0009: 400
+    VAD0010: 400
+    VAD0011: 400
+    VAD0012: 404
+    VAD0013: 400
+    VAD0014: 400
+    VAD0015: 400
+    VAD0016: 400
+    VAD0017: 400
+    VAD0018: 400
+    VAD0019: 400
+    MAT0001: 400
+    TIA0001: 400
+    VEH0001: 400
+    FPW0001: 400
+  login:
+    success: "Đăng nhập thành công"
+    fail: "Tài khoản hoặc mật khẩu không đúng"
+    binding_fail_data: "Thông tin đăng nhập không hợp lệ"
+  common:
+    success:
+      get: "Lấy dữ liệu thành công"
+      post: "Cập nhật dữ liệu thành công"
+      put: "Chỉnh sửa dữ liệu thành công"
+      delete: "Xoá dữ liệu thành công"
+    error:
+      get: "Lấy dữ liệu thất bại"
+      post: "Cập nhật dữ liệu thất bại"
+      put: "Chỉnh sửa dữ liệu thất bại"
+      delete: "Xoá dữ liệu thất bại"
+

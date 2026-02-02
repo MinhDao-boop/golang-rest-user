@@ -2,6 +2,7 @@ package repository
 
 import (
 	"golang-rest-user/models"
+	"golang-rest-user/utils"
 
 	"gorm.io/gorm"
 )
@@ -56,7 +57,6 @@ func (r *tenantRepo) GetByDBName(dbName string) (*models.Tenant, error) {
 }
 
 func (r *tenantRepo) GetList(page, pageSize int, search string) (tenants []models.Tenant, total int64, err error) {
-	offset := (page - 1) * pageSize
 	query := r.db.Model(&models.Tenant{})
 
 	query = query.Where("name LIKE ?", "%"+search+"%")
@@ -64,7 +64,8 @@ func (r *tenantRepo) GetList(page, pageSize int, search string) (tenants []model
 	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
-	if err := query.Offset(offset).Limit(pageSize).Find(&tenants).Error; err != nil {
+	query = query.Scopes(utils.PaginateGORM(page, pageSize))
+	if err := query.Find(&tenants).Error; err != nil {
 		return nil, 0, err
 	}
 	return tenants, total, nil

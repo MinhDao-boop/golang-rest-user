@@ -8,19 +8,19 @@ import (
 )
 
 func TenantRoutes(r *gin.RouterGroup) {
-	r.GET("", handler.ListTenant)                   // GET /api/v1/tenants
-	r.POST("", handler.CreateTenant)                // POST /api/v1/tenants
-	r.GET("/:tenant_uuid", handler.GetByTenantCode) // GET /api/v1/tenants/:tenant_uuid
+	r.GET("", handler.ListTenant)    // GET /api/v1/tenants
+	r.POST("", handler.CreateTenant) // POST /api/v1/tenants
+	//r.GET("/:tenant_uuid", handler.GetByTenantCode) // GET /api/v1/tenants/:tenant_uuid
 	r.PUT("/:tenant_uuid", handler.UpdateTenant)    // PUT /api/v1/tenants/:tenant_uuid
 	r.DELETE("/:tenant_uuid", handler.DeleteTenant) // DELETE /api/v1/tenants/:tenant_uuid
 }
 
 func UserRoutes(r *gin.RouterGroup) {
-	r.GET("", tenant.ListUsers)                // GET /api/v1/users
-	r.POST("", tenant.CreateUser)              // POST /api/v1/users
-	r.DELETE("", tenant.DeleteManyUsers)       // DELETE /api/v1/users
-	r.GET("/:user_uuid", tenant.GetByUserUUID) // GET /api/v1/users/:user_uuid
-	r.PUT("/:user_uuid", tenant.UpdateUser)    // PUT /api/v1/users/:user_uuid
+	r.GET("", tenant.ListUsers)          // GET /api/v1/users
+	r.POST("", tenant.CreateUser)        // POST /api/v1/users
+	r.DELETE("", tenant.DeleteManyUsers) // DELETE /api/v1/users
+	//r.GET("/:user_uuid", tenant.GetByUserUUID) // GET /api/v1/users/:user_uuid
+	r.PUT("/:user_uuid", tenant.UpdateUser) // PUT /api/v1/users/:user_uuid
 }
 
 func AuthRoutes(r *gin.RouterGroup) {

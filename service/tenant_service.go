@@ -1,9 +1,9 @@
 package service
 
 import (
-	"errors"
 	"golang-rest-user/enums"
 	"golang-rest-user/models"
+	"golang-rest-user/response"
 	"golang-rest-user/utils"
 	"regexp"
 	"strings"
@@ -20,12 +20,12 @@ type CallBackFunction func(mode enums.HandleTenant, tenantCode string, tenant *m
 var dbnameRegex = regexp.MustCompile("^[a-z0-9_]{1,64}$")
 
 type TenantService interface {
-	Create(dto.CreateTenantRequest) (*dto.TenantResponse, error)
+	Create(dto.CreateTenantRequest) *response.Response
 	GetByUUID(string) (*dto.TenantResponse, error)
-	List(page, pageSize int, search string) ([]dto.TenantResponse, int64, error)
+	List(request dto.ListTenantRequest) *response.Response
 	ListAllTenantConnect() ([]models.Tenant, error)
-	Update(tenantCode string, req dto.UpdateTenantRequest) (*dto.TenantResponse, error)
-	Delete(string) error
+	Update(tenantCode string, req dto.UpdateTenantRequest) *response.Response
+	Delete(string) *response.Response
 	SetCallBackFunction(CallBackFunction)
 }
 
@@ -56,28 +56,36 @@ func isValidDBName(name string) bool {
 	return dbnameRegex.MatchString(name)
 }
 
-func (s *tenantServiceImpl) Create(req dto.CreateTenantRequest) (*dto.TenantResponse, error) {
-	// check tenant code existing
+func (s *tenantServiceImpl) Create(req dto.CreateTenantRequest) *response.Response {
+	newResponse := response.NewResponse()
 	if _, err := s.repo.GetByUUID(req.Code); err == nil {
-		return nil, errors.New("tenant code already exists")
+		newResponse.Err = response.ErrExistingTenantCode
+		newResponse.MessageCode = response.VAD0000
+		return newResponse
 	}
 	//check db name existing
 	if _, err := s.repo.GetByDBName(req.DBName); err == nil {
-		return nil, errors.New("db name already exists")
+		newResponse.Err = response.ErrExistingDBName
+		newResponse.MessageCode = response.VAD0000
+		return newResponse
 	}
 	//Validate dbname
 	if !isValidDBName(req.DBName) {
-		return nil, errors.New("invalid db name")
+		newResponse.Err = response.ErrInvalidDBName
+		newResponse.MessageCode = response.VAD0000
+		return newResponse
 	}
 	//AESGCMEncrypt db user
 	encryptedUser, err := utils.AESGCMEncrypt(req.DBUser)
 	if err != nil {
-		return nil, err
+		newResponse.Err = err
+		return newResponse
 	}
 	//AESGCMEncrypt db password
 	encryptedPass, err := utils.AESGCMEncrypt(req.DBPass)
 	if err != nil {
-		return nil, err
+		newResponse.Err = err
+		return newResponse
 	}
 	tenant := &models.Tenant{
 		Code:   req.Code,
@@ -95,13 +103,16 @@ func (s *tenantServiceImpl) Create(req dto.CreateTenantRequest) (*dto.TenantResp
 			s.callBackFunction(enums.AddTenantConnect, tenant.Code, tenant)
 		}()
 	}
-	if err := s.repo.Create(tenant); err != nil {
+	if err = s.repo.Create(tenant); err != nil {
 		go func() {
 			s.callBackFunction(enums.DropTenantConnect, tenant.Code, tenant)
 		}()
-		return nil, err
+		newResponse.Err = err
+		return newResponse
 	}
-	return s.convertToTenantResponse(tenant), nil
+	newResponse.Data = s.convertToTenantResponse(tenant)
+	newResponse.MessageCode = response.SUS0000
+	return newResponse
 }
 
 func (s *tenantServiceImpl) GetByUUID(uuid string) (*dto.TenantResponse, error) {
@@ -113,17 +124,25 @@ func (s *tenantServiceImpl) GetByUUID(uuid string) (*dto.TenantResponse, error) 
 	return s.convertToTenantResponse(tenant), nil
 }
 
-func (s *tenantServiceImpl) List(page, pageSize int, search string) ([]dto.TenantResponse, int64, error) {
-	search = strings.TrimSpace(search)
-	tenants, total, err := s.repo.GetList(page, pageSize, search)
+func (s *tenantServiceImpl) List(req dto.ListTenantRequest) *response.Response {
+	newResponse := response.NewResponse()
+	req.Search = strings.TrimSpace(req.Search)
+	tenants, total, err := s.repo.GetList(req.Page, req.PageSize, req.Search)
 	if err != nil {
-		return nil, 0, err
+		newResponse.Err = err
+		return newResponse
 	}
 	var result []dto.TenantResponse
 	for _, t := range tenants {
 		result = append(result, *s.convertToTenantResponse(&t))
 	}
-	return result, total, nil
+	newResponse.Data = &response.ListResponse{
+		Page:     req.Page,
+		PageSize: req.PageSize,
+		Total:    total,
+		Contents: result,
+	}
+	return newResponse
 }
 
 func (s *tenantServiceImpl) ListAllTenantConnect() ([]models.Tenant, error) {
@@ -134,20 +153,24 @@ func (s *tenantServiceImpl) ListAllTenantConnect() ([]models.Tenant, error) {
 	return tenants, nil
 }
 
-func (s *tenantServiceImpl) Update(uuid string, req dto.UpdateTenantRequest) (*dto.TenantResponse, error) {
+func (s *tenantServiceImpl) Update(uuid string, req dto.UpdateTenantRequest) *response.Response {
+	newResponse := response.NewResponse()
 	tenant, err := s.repo.GetByUUID(uuid)
 	if err != nil {
-		return nil, err
+		newResponse.Err = err
+		return newResponse
 	}
 	//AESGCMDecrypt old db user
 	oldDBUser, err := utils.AESGCMDecrypt(tenant.DBUser)
 	if err != nil {
-		return nil, err
+		newResponse.Err = err
+		return newResponse
 	}
 	//AESGCMDecrypt old db password
 	oldDBPass, err := utils.AESGCMDecrypt(tenant.DBPass)
 	if err != nil {
-		return nil, err
+		newResponse.Err = err
+		return newResponse
 	}
 	oldTenant := &models.Tenant{
 		DBUser: oldDBUser,
@@ -157,20 +180,25 @@ func (s *tenantServiceImpl) Update(uuid string, req dto.UpdateTenantRequest) (*d
 		// no need to reconnect, just update other fields
 		tenant.Name = req.Name
 		tenant.UpdatedAt = time.Now().UTC()
-		if err := s.repo.Update(tenant); err != nil {
-			return nil, err
+		if err = s.repo.Update(tenant); err != nil {
+			newResponse.Err = err
+			return newResponse
 		}
-		return s.convertToTenantResponse(tenant), nil
+		newResponse.Data = s.convertToTenantResponse(tenant)
+		newResponse.MessageCode = response.SUS0000
+		return newResponse
 	}
 	//AESGCMEncrypt db user
 	encryptedUser, err := utils.AESGCMEncrypt(req.DBUser)
 	if err != nil {
-		return nil, err
+		newResponse.Err = err
+		return newResponse
 	}
 	//AESGCMEncrypt db password
 	encryptedPass, err := utils.AESGCMEncrypt(req.DBPass)
 	if err != nil {
-		return nil, err
+		newResponse.Err = err
+		return newResponse
 	}
 	tenant.Name = req.Name
 	tenant.DBUser = encryptedUser
@@ -188,10 +216,12 @@ func (s *tenantServiceImpl) Update(uuid string, req dto.UpdateTenantRequest) (*d
 		go func() {
 			s.callBackFunction(enums.DeleteTenantConnect, tenant.Code, tenant)
 		}()
-		return nil, err
+		newResponse.Err = err
+		return newResponse
 	}
-
-	return s.convertToTenantResponse(tenant), nil
+	newResponse.Data = s.convertToTenantResponse(tenant)
+	newResponse.MessageCode = response.SUS0000
+	return newResponse
 }
 
 func needReconnect(oldTenant *models.Tenant, req dto.UpdateTenantRequest) bool {
@@ -201,17 +231,24 @@ func needReconnect(oldTenant *models.Tenant, req dto.UpdateTenantRequest) bool {
 		oldTenant.DBPort != req.DBPort
 }
 
-func (s *tenantServiceImpl) Delete(uuid string) error {
+func (s *tenantServiceImpl) Delete(uuid string) *response.Response {
+	newResponse := response.NewResponse()
 	tenant, err := s.repo.GetByUUID(uuid)
 	if err != nil {
-		return err
+		newResponse.Err = err
+		return newResponse
 	}
 	if s.callBackFunction != nil {
 		go func() {
 			s.callBackFunction(enums.DeleteTenantConnect, tenant.Code, tenant)
 		}()
 	}
-	return s.repo.DeleteByUUID(tenant.BaseModel.UUID)
+	if err = s.repo.DeleteByUUID(tenant.BaseModel.UUID); err != nil {
+		newResponse.Err = err
+		return newResponse
+	}
+	newResponse.MessageCode = response.SUS0000
+	return newResponse
 }
 
 func (s *tenantServiceImpl) SetCallBackFunction(callBackFunction CallBackFunction) {

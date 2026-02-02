@@ -1,19 +1,21 @@
 package utils
 
 import (
-	"strconv"
-
-	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
-func GetPageAndPageSize(c *gin.Context) (int, int) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "50"))
-	if page <= 0 {
-		page = 1
+func PaginateGORM(page, pageSize int) func(db *gorm.DB) *gorm.DB {
+	return func(db *gorm.DB) *gorm.DB {
+		if page <= 0 {
+			page = 1
+		}
+		switch {
+		case pageSize > 100:
+			pageSize = 100
+		case pageSize <= 0:
+			pageSize = 10
+		}
+		offset := (page - 1) * pageSize
+		return db.Limit(pageSize).Offset(offset)
 	}
-	if pageSize <= 0 || pageSize > 100 {
-		pageSize = 10
-	}
-	return page, pageSize
 }

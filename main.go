@@ -1,6 +1,7 @@
 package main
 
 import (
+	"golang-rest-user/provider/configProvider"
 	"golang-rest-user/provider/mySqlProvider"
 	"golang-rest-user/provider/redisProvider"
 	"golang-rest-user/provider/routesProvider"
@@ -11,7 +12,7 @@ import (
 )
 
 func main() {
-
+	configProvider.Init()
 	redisProvider.Init()
 	mySqlProvider.Init()
 	serviceProvider.Init()

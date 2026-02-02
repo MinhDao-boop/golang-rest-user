@@ -1,9 +1,6 @@
 package middleware
 
 import (
-	//"log"
-	"net/http"
-
 	"golang-rest-user/response"
 
 	"github.com/gin-gonic/gin"
@@ -13,7 +10,7 @@ func TenantDBMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tenantCode := c.GetHeader("X-Tenant-Code")
 		if tenantCode == "" {
-			response.Error(c, response.CodeBadRequest, "X-Tenant-Code header is required", nil, http.StatusInternalServerError)
+			response.Error(c, response.TEN0001, response.ErrMissingIdentifier)
 			return
 		}
 		c.Set("TENANT_CODE", tenantCode)

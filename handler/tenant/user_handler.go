@@ -4,9 +4,6 @@ import (
 	"golang-rest-user/dto"
 	"golang-rest-user/provider/tenantProvider"
 	"golang-rest-user/response"
-	"golang-rest-user/utils"
-	"net/http"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -18,22 +15,12 @@ func ListUsers(c *gin.Context) {
 		return
 	}
 	service := tenantProvider.GetTenantInfo(tenantCode)
-
-	page, pageSize := utils.GetPageAndPageSize(c)
-	search := c.Query("search")
-
-	userResponses, total, err := service.UserService.List(page, pageSize, search)
-	if err != nil {
-		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusInternalServerError)
-		return
+	var req dto.ListUsersRequest
+	if err := c.ShouldBind(&req); err != nil {
+		response.Error(c, response.VAD0000, err)
 	}
-
-	response.Success(c, gin.H{
-		"data":      userResponses,
-		"page":      page,
-		"page_size": pageSize,
-		"total":     total,
-	})
+	userResponse := service.UserService.List(req)
+	response.Data(c, userResponse)
 }
 
 // POST /users
@@ -46,41 +33,29 @@ func CreateUser(c *gin.Context) {
 
 	var req dto.CreateUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
+		response.Error(c, response.VAD0000, err)
 		return
 	}
-
-	userResponse, err := service.UserService.Create(req)
-	if err != nil {
-		if strings.Contains(err.Error(), "exists") {
-			response.Error(c, response.CodeBadRequest, "username already exists", nil, http.StatusConflict)
-			return
-		}
-		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusInternalServerError)
-		return
-	}
-
-	//location := c.Request.URL.Path + "/" + strconv.FormatUint(uint64(userResponse.ID), 10)
-	//c.Header("Location", location)
-	response.Success(c, userResponse)
+	userResponse := service.UserService.Create(req)
+	response.Data(c, userResponse)
 }
 
-// GET /users/:user_uuid
-func GetByUserUUID(c *gin.Context) {
-	tenantCode := c.GetString("tenant_code")
-	if tenantCode == "" {
-		return
-	}
-	service := tenantProvider.GetTenantInfo(tenantCode)
-
-	uuid := c.Param("user_uuid")
-	userResponse, err := service.UserService.GetByUUID(uuid)
-	if err != nil {
-		response.Error(c, response.CodeBadRequest, "user not found", nil, http.StatusBadRequest)
-		return
-	}
-	response.Success(c, userResponse)
-}
+//// GET /users/:user_uuid
+//func GetByUserUUID(c *gin.Context) {
+//	tenantCode := c.GetString("tenant_code")
+//	if tenantCode == "" {
+//		return
+//	}
+//	service := tenantProvider.GetTenantInfo(tenantCode)
+//
+//	uuid := c.Param("user_uuid")
+//	userResponse, err := service.UserService.GetByUUID(uuid)
+//	if err != nil {
+//		response.Error(c, response.ERR0001, "user not found", nil, http.StatusBadRequest)
+//		return
+//	}
+//	response.Success(c, userResponse)
+//}
 
 // PUT /users/:user_uuid
 func UpdateUser(c *gin.Context) {
@@ -93,16 +68,11 @@ func UpdateUser(c *gin.Context) {
 
 	var req dto.UpdateUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
+		response.Error(c, response.VAD0000, err)
 		return
 	}
-
-	userResponse, err := service.UserService.Update(uuid, req)
-	if err != nil {
-		response.Error(c, response.CodeBadRequest, "user not found", nil, http.StatusNotFound)
-		return
-	}
-	response.Success(c, userResponse)
+	userResponse := service.UserService.Update(uuid, req)
+	response.Data(c, userResponse)
 }
 
 // DELETE /users
@@ -114,13 +84,9 @@ func DeleteManyUsers(c *gin.Context) {
 	service := tenantProvider.GetTenantInfo(tenantCode)
 	var req dto.DeleteUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, response.CodeBadRequest, err.Error(), nil, http.StatusBadRequest)
+		response.Error(c, response.VAD0000, err)
 		return
 	}
-	deleted, err := service.UserService.DeleteMany(req)
-	if err != nil {
-		response.Error(c, response.CodeBadRequest, err.Error(), gin.H{"deleted": deleted}, http.StatusBadRequest)
-		return
-	}
-	response.Success(c, gin.H{"deleted": deleted})
+	userResponse := service.UserService.DeleteMany(req)
+	response.Data(c, userResponse)
 }
