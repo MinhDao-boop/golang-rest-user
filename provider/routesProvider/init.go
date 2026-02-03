@@ -39,4 +39,8 @@ func Init(router *gin.Engine) {
 	sosContact := v1.Group("/sos-contacts")
 	sosContact.Use(middleware.AuthMiddleware(jwtManager))
 	routes.SOSContactRoutes(sosContact)
+
+	escapeLink := v1.Group("/zones/:zone_uuid/escape")
+	escapeLink.Use(middleware.AuthMiddleware(jwtManager))
+	routes.EscapeLinkRoutes(escapeLink)
 }

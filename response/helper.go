@@ -24,8 +24,8 @@ func Data(c *gin.Context, data *Response) {
 
 func Success(c *gin.Context, messageCode string, data interface{}) {
 	config := configProvider.GetConfig()
-	vn := config.GetStringMap("message.vn")
-	codeMap := config.GetStringMap("message.code")
+	vn := config.GetStringMap("messages.vn")
+	codeMap := config.GetStringMap("messages.code")
 	code, _ := codeMap[strings.ToLower(messageCode)].(int)
 	c.JSON(code, gin.H{
 		"code":        messageCode,
@@ -39,8 +39,8 @@ func Success(c *gin.Context, messageCode string, data interface{}) {
 
 func Error(c *gin.Context, messageCode string, err error) {
 	config := configProvider.GetConfig()
-	vn := config.GetStringMap("message.vn")
-	codeMap := config.GetStringMap("message.code")
+	vn := config.GetStringMap("messages.vn")
+	codeMap := config.GetStringMap("messages.code")
 	code, _ := codeMap[strings.ToLower(messageCode)].(int)
 	c.JSON(code, gin.H{
 		"code":        messageCode,

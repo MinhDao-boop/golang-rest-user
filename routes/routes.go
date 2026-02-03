@@ -51,3 +51,8 @@ func SOSContactRoutes(r *gin.RouterGroup) {
 	r.PATCH("/:contact_uuid/toggle", tenant.ToggleSOSContactStatus) // PATCH /api/v1/sos-contacts/:contact_uuid/toggle
 	r.DELETE("", tenant.DeleteSOSContact)                           // DELETE /api/v1/sos-contacts
 }
+
+func EscapeLinkRoutes(r *gin.RouterGroup) {
+	r.GET("", tenant.GetWebView)            // GET api/v1/zone/:zone_uuid/escape
+	r.POST("", tenant.UpsertZoneEscapeLink) // POST /zone/:zone_uuid/escape
+}

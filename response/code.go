@@ -80,6 +80,12 @@ var (
 	// ErrTokenExpired indicates that the client requests an expired token
 	ErrTokenExpired = errors.New("token expired")
 
-	// ErrInvalidSharing indicates that that users share the zone to themself
+	// ErrInvalidSharing indicates that users share the zone to themself
 	ErrInvalidSharing = errors.New("invalid sharing")
+
+	// ErrInvalidJsonObj indicates that the client sends an invalid JSON object
+	ErrInvalidJsonObj = errors.New("invalid json object")
+
+	// ErrInvalidJsonArray indicates that the client sends an invalid JSON array
+	ErrInvalidJsonArray = errors.New("invalid json array")
 )
