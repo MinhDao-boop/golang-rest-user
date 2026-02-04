@@ -16,12 +16,17 @@ func CreateSOSContact(c *gin.Context) {
 	}
 	userId := c.GetUint("user_id")
 	service := tenantProvider.GetTenantInfo(tenantCode)
+	var query dto.ZoneIdQuery
+	if err := c.ShouldBindQuery(&query); err != nil {
+		response.Error(c, response.VAD0000, err)
+		return
+	}
 	var req dto.CreateSOSContactRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, response.VAD0000, err)
 		return
 	}
-	sosResponse := service.SOSContactService.Create(req, userId)
+	sosResponse := service.SOSContactService.Create(req, userId, query.ZoneUuid)
 	response.Data(c, sosResponse)
 }
 
@@ -36,6 +41,7 @@ func ListSOSContact(c *gin.Context) {
 	var input dto.ListSOSContactRequest
 	if err := c.ShouldBind(&input); err != nil {
 		response.Error(c, response.VAD0000, err)
+		return
 	}
 	sosResponse := service.SOSContactService.ListByZone(input, userId)
 	response.Data(c, sosResponse)
@@ -50,12 +56,17 @@ func UpdateSOSContact(c *gin.Context) {
 	userId := c.GetUint("user_id")
 	contactUuid := c.Param("contact_uuid")
 	service := tenantProvider.GetTenantInfo(tenantCode)
-	var req = dto.UpdateSOSContactRequest{}
-	if err := c.ShouldBindJSON(&req); err != nil {
+	var query dto.ZoneIdQuery
+	if err := c.ShouldBindQuery(&query); err != nil {
 		response.Error(c, response.VAD0000, err)
 		return
 	}
-	sosResponse := service.SOSContactService.Update(req, contactUuid, userId)
+	var req dto.UpdateSOSContactRequest
+	if err := c.ShouldBind(&req); err != nil {
+		response.Error(c, response.VAD0000, err)
+		return
+	}
+	sosResponse := service.SOSContactService.Update(req, contactUuid, query.ZoneUuid, userId)
 	response.Data(c, sosResponse)
 }
 
@@ -68,12 +79,17 @@ func ToggleSOSContactStatus(c *gin.Context) {
 	userId := c.GetUint("user_id")
 	service := tenantProvider.GetTenantInfo(tenantCode)
 	contactUuid := c.Param("contact_uuid")
-	var req = dto.ToggleSOSContactRequest{}
-	if err := c.ShouldBindJSON(&req); err != nil {
+	var query dto.ZoneIdQuery
+	if err := c.ShouldBindQuery(&query); err != nil {
 		response.Error(c, response.VAD0000, err)
 		return
 	}
-	sosResponse := service.SOSContactService.ToggleStatus(req, contactUuid, userId)
+	var req dto.ToggleSOSContactRequest
+	if err := c.ShouldBind(&req); err != nil {
+		response.Error(c, response.VAD0000, err)
+		return
+	}
+	sosResponse := service.SOSContactService.ToggleStatus(req, contactUuid, query.ZoneUuid, userId)
 	response.Data(c, sosResponse)
 }
 
@@ -85,11 +101,16 @@ func DeleteSOSContact(c *gin.Context) {
 	}
 	userId := c.GetUint("user_id")
 	service := tenantProvider.GetTenantInfo(tenantCode)
-	var req = dto.DeleteSOSContactRequest{}
-	if err := c.ShouldBindJSON(&req); err != nil {
+	var query dto.ZoneIdQuery
+	if err := c.ShouldBindQuery(&query); err != nil {
 		response.Error(c, response.VAD0000, err)
 		return
 	}
-	sosResponse := service.SOSContactService.DeleteMany(req, userId)
+	var req dto.DeleteSOSContactRequest
+	if err := c.ShouldBind(&req); err != nil {
+		response.Error(c, response.VAD0000, err)
+		return
+	}
+	sosResponse := service.SOSContactService.DeleteMany(req, userId, query.ZoneUuid)
 	response.Data(c, sosResponse)
 }

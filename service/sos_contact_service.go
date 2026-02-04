@@ -14,13 +14,11 @@ import (
 )
 
 type SOSContactService interface {
-	Create(req dto.CreateSOSContactRequest, userId uint) *response.Response
+	Create(req dto.CreateSOSContactRequest, userId uint, zoneUuid string) *response.Response
 	ListByZone(req dto.ListSOSContactRequest, userId uint) *response.Response
-	Update(req dto.UpdateSOSContactRequest, contactUuid string, userId uint) *response.Response
-	ToggleStatus(req dto.ToggleSOSContactRequest, contactUuid string, userId uint) *response.Response
-	DeleteMany(req dto.DeleteSOSContactRequest, userId uint) *response.Response
-	GetByUuid(string) (*dto.SOSContactResponse, error)
-	convertToDTO(contact *models.SOSContact) *dto.SOSContactResponse
+	Update(req dto.UpdateSOSContactRequest, contactUuid, zoneUuid string, userId uint) *response.Response
+	ToggleStatus(req dto.ToggleSOSContactRequest, contactUuid, zoneUuid string, userId uint) *response.Response
+	DeleteMany(req dto.DeleteSOSContactRequest, userId uint, zoneUuid string) *response.Response
 }
 
 type SOSContactServiceImpl struct {
@@ -29,15 +27,15 @@ type SOSContactServiceImpl struct {
 	zoneSvc        ZoneService
 }
 
-func (s *SOSContactServiceImpl) GetByUuid(contactUuid string) (*dto.SOSContactResponse, error) {
-	contact, err := s.sosContactRepo.GetByUUID(contactUuid)
-	if err != nil {
-		return nil, err
-	}
-	return s.convertToDTO(contact), nil
-}
+//func (s *SOSContactServiceImpl) GetByUuid(contactUuid string) (*dto.SOSContactResponse, error) {
+//	contact, err := s.sosContactRepo.GetByContactAndZone(contactUuid)
+//	if err != nil {
+//		return nil, err
+//	}
+//	return s.convertToDTO(contact), nil
+//}
 
-func (s *SOSContactServiceImpl) Create(req dto.CreateSOSContactRequest, userId uint) *response.Response {
+func (s *SOSContactServiceImpl) Create(req dto.CreateSOSContactRequest, userId uint, zoneUuid string) *response.Response {
 	newResponse := response.NewResponse()
 	normalizedPhone, err := utils.NormalizePhone(req.Phone)
 	if err != nil {
@@ -47,7 +45,7 @@ func (s *SOSContactServiceImpl) Create(req dto.CreateSOSContactRequest, userId u
 	//if !enums.IsValidRoleKey(req.Role) {
 	//	return nil, errors.New("invalid role")
 	//}
-	zone, err := s.zoneSvc.GetByUUID(req.ZoneUuid)
+	zone, err := s.zoneSvc.GetByUUID(zoneUuid)
 	if err != nil {
 		newResponse.Err = err
 		return newResponse
@@ -80,7 +78,7 @@ func (s *SOSContactServiceImpl) Create(req dto.CreateSOSContactRequest, userId u
 		newResponse.Err = err
 		return newResponse
 	}
-	newResponse.Data = sosContact
+	newResponse.Data = s.convertToDTO(&sosContact)
 	newResponse.MessageCode = response.SUS0000
 	return newResponse
 }
@@ -127,14 +125,14 @@ func (s *SOSContactServiceImpl) ListByZone(req dto.ListSOSContactRequest, userId
 	return newResponse
 }
 
-func (s *SOSContactServiceImpl) Update(req dto.UpdateSOSContactRequest, contactUuid string, userId uint) *response.Response {
+func (s *SOSContactServiceImpl) Update(req dto.UpdateSOSContactRequest, contactUuid, zoneUuid string, userId uint) *response.Response {
 	newResponse := response.NewResponse()
-	zone, err := s.zoneSvc.GetByUUID(req.ZoneUuid)
+	zone, err := s.zoneSvc.GetByUUID(zoneUuid)
 	if err != nil {
 		newResponse.Err = err
 		return newResponse
 	}
-	contact, err := s.sosContactRepo.GetByUUID(contactUuid)
+	contact, err := s.sosContactRepo.GetByContactAndZone(contactUuid, zone.ID)
 	if err != nil {
 		newResponse.Err = err
 		return newResponse
@@ -172,9 +170,9 @@ func (s *SOSContactServiceImpl) Update(req dto.UpdateSOSContactRequest, contactU
 	return newResponse
 }
 
-func (s *SOSContactServiceImpl) ToggleStatus(req dto.ToggleSOSContactRequest, contactUuid string, userId uint) *response.Response {
+func (s *SOSContactServiceImpl) ToggleStatus(req dto.ToggleSOSContactRequest, contactUuid, zoneUuid string, userId uint) *response.Response {
 	newResponse := response.NewResponse()
-	zone, err := s.zoneSvc.GetByUUID(req.ZoneUuid)
+	zone, err := s.zoneSvc.GetByUUID(zoneUuid)
 	if err != nil {
 		newResponse.Err = err
 		return newResponse
@@ -184,7 +182,7 @@ func (s *SOSContactServiceImpl) ToggleStatus(req dto.ToggleSOSContactRequest, co
 		newResponse.MessageCode = response.FBD0000
 		return newResponse
 	}
-	contact, err := s.sosContactRepo.GetByUUID(contactUuid)
+	contact, err := s.sosContactRepo.GetByContactAndZone(contactUuid, zone.ID)
 	if err != nil {
 		newResponse.Err = err
 		return newResponse
@@ -205,10 +203,10 @@ func (s *SOSContactServiceImpl) ToggleStatus(req dto.ToggleSOSContactRequest, co
 	return newResponse
 }
 
-func (s *SOSContactServiceImpl) DeleteMany(req dto.DeleteSOSContactRequest, userId uint) *response.Response {
+func (s *SOSContactServiceImpl) DeleteMany(req dto.DeleteSOSContactRequest, userId uint, zoneUuid string) *response.Response {
 	var deleted int64
 	newResponse := response.NewResponse()
-	zone, err := s.zoneSvc.GetByUUID(req.ZoneUuid)
+	zone, err := s.zoneSvc.GetByUUID(zoneUuid)
 	if err != nil {
 		newResponse.Err = err
 		newResponse.Data = &response.DeleteResponse{
@@ -224,7 +222,7 @@ func (s *SOSContactServiceImpl) DeleteMany(req dto.DeleteSOSContactRequest, user
 		}
 		return newResponse
 	}
-	deleted, err = s.sosContactRepo.DeleteByIds(req.Ids)
+	deleted, err = s.sosContactRepo.DeleteMany(req.Ids, zone.ID)
 	if err != nil {
 		newResponse.Err = err
 		newResponse.Data = &response.DeleteResponse{

@@ -3,6 +3,7 @@ package routesProvider
 import (
 	"golang-rest-user/middleware"
 	"golang-rest-user/provider/serviceProvider"
+	"golang-rest-user/response"
 	"golang-rest-user/routes"
 
 	"github.com/gin-gonic/gin"
@@ -14,6 +15,8 @@ func Init(router *gin.Engine) {
 	router.Use(gin.Recovery())
 
 	router.Use(middleware.RequestID())
+
+	router.GET("/", response.HealthCheck)
 
 	v1 := router.Group("api/v1")
 

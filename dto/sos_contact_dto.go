@@ -5,12 +5,14 @@ import (
 	"time"
 )
 
+type ZoneIdQuery struct {
+	ZoneUuid string `form:"zone_uuid" binding:"required"`
+}
 type CreateSOSContactRequest struct {
-	ZoneUuid string `json:"zone_uuid" form:"zone_uuid" binding:"required"`
-	Name     string `json:"name" binding:"required"`
-	Role     string `json:"role" binding:"required"`
-	Phone    string `json:"phone" binding:"required"`
-	Note     string `json:"note"`
+	Name  string `json:"name" binding:"required"`
+	Role  string `json:"role" binding:"required"`
+	Phone string `json:"phone" binding:"required"`
+	Note  string `json:"note"`
 }
 
 type ListSOSContactRequest struct {
@@ -23,21 +25,18 @@ type ListSOSContactRequest struct {
 }
 
 type UpdateSOSContactRequest struct {
-	ZoneUuid string  `json:"zone_uuid" form:"zone_uuid" binding:"required"`
-	Name     *string `json:"name" binding:"required" patch:"true"`
-	Role     *string `json:"role" binding:"required" patch:"true"`
-	Phone    *string `json:"phone" binding:"required" patch:"true"`
-	Note     string  `json:"note" patch:"true"`
+	Name  *string `json:"name" binding:"required" patch:"true"`
+	Role  *string `json:"role" binding:"required" patch:"true"`
+	Phone *string `json:"phone" binding:"required" patch:"true"`
+	Note  string  `json:"note" patch:"true"`
 }
 
 type ToggleSOSContactRequest struct {
-	ZoneUuid string                  `json:"zone_uuid" form:"zone_uuid" binding:"required"`
 	IsActive *enums.SOSContactStatus `json:"is_active" patch:"true"`
 }
 
 type DeleteSOSContactRequest struct {
-	ZoneUuid string `json:"zone_uuid" form:"zone_uuid" binding:"required"`
-	Ids      []uint `json:"ids"`
+	Ids []uint `json:"ids"`
 }
 
 type SOSContactResponse struct {

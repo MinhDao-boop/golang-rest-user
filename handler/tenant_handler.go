@@ -14,6 +14,7 @@ func ListTenant(c *gin.Context) {
 	var req dto.ListTenantRequest
 	if err := c.ShouldBind(&req); err != nil {
 		response.Error(c, response.VAD0000, err)
+		return
 	}
 	tenantResponses := appService.TenantService.List(req)
 	response.Data(c, tenantResponses)

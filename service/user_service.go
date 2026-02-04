@@ -146,9 +146,7 @@ func (s *userServiceImpl) Update(uuid string, req dto.UpdateUserRequest) *respon
 
 func (s *userServiceImpl) DeleteMany(req dto.DeleteUserRequest) *response.Response {
 	newResponse := response.NewResponse()
-	req.UUIDs = strings.TrimSpace(req.UUIDs)
-	uuids := strings.Split(req.UUIDs, ",")
-	deleted, err := s.repo.DeleteByUUIDs(uuids)
+	deleted, err := s.repo.DeleteByUUIDs(req.Uuids)
 	if err != nil {
 		newResponse.Err = err
 		return newResponse

@@ -13,8 +13,8 @@ type SOSContactRepo interface {
 	UpdateMap(string, map[string]interface{}) error
 	Update(string, *models.SOSContact) error
 	ListByZone(zoneId uint, page, pageSize int, search string, isAll bool, isActive *bool) ([]models.SOSContact, int64, error)
-	DeleteByIds([]uint) (int64, error)
-	GetByUUID(string) (*models.SOSContact, error)
+	DeleteMany([]uint, uint) (int64, error)
+	GetByContactAndZone(string, uint) (*models.SOSContact, error)
 	GetByPhone(interface{}) (*models.SOSContact, error)
 }
 
@@ -66,9 +66,11 @@ func (r *SOSContactRepoImpl) GetByPhone(phone interface{}) (*models.SOSContact, 
 	return &contact, nil
 }
 
-func (r *SOSContactRepoImpl) GetByUUID(uuid string) (*models.SOSContact, error) {
+func (r *SOSContactRepoImpl) GetByContactAndZone(contactUuid string, zoneId uint) (*models.SOSContact, error) {
 	var contact models.SOSContact
-	if err := r.db.Model(&models.SOSContact{}).Where("uuid = ?", uuid).First(&contact).Error; err != nil {
+	if err := r.db.Model(&models.SOSContact{}).
+		Joins("JOIN zone_sos zs ON zs.sos_contact_id = sos_contacts.id").
+		Where("sos_contacts.uuid = ? AND zs.zone_id = ?", contactUuid, zoneId).First(&contact).Error; err != nil {
 		return nil, err
 	}
 	return &contact, nil
@@ -83,9 +85,20 @@ func (r *SOSContactRepoImpl) UpdateMap(uuid string, updates map[string]interface
 		Updates(updates).Error
 }
 
-func (r *SOSContactRepoImpl) DeleteByIds(ids []uint) (int64, error) {
-	res := r.db.Unscoped().Delete(&models.SOSContact{}, ids)
-	return res.RowsAffected, res.Error
+func (r *SOSContactRepoImpl) DeleteMany(contactIds []uint, zoneId uint) (int64, error) {
+	db := r.db
+
+	subQuery := db.
+		Table("zone_sos").
+		Select("sos_contact_id").
+		Where("zone_id = ?", zoneId)
+
+	result := db.
+		Where("id IN (?)", subQuery).
+		Where("id IN (?)", contactIds).
+		Delete(&models.SOSContact{})
+
+	return result.RowsAffected, result.Error
 }
 
 func NewSOSContactRepo(db *gorm.DB) SOSContactRepo {

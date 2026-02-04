@@ -15,7 +15,7 @@ type ListUsersRequest struct {
 }
 
 type DeleteUserRequest struct {
-	UUIDs string `json:"uuid" binding:"omitempty"`
+	Uuids []string `json:"uuid" binding:"omitempty"`
 }
 
 type LoginRequest struct {
