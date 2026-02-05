@@ -4,6 +4,7 @@ import (
 	"golang-rest-user/dto"
 	"golang-rest-user/enums"
 	"golang-rest-user/models"
+	"golang-rest-user/provider/redisProvider"
 	"golang-rest-user/repository"
 	"golang-rest-user/response"
 	"golang-rest-user/utils"
@@ -25,15 +26,56 @@ type SOSContactServiceImpl struct {
 	sosContactRepo repository.SOSContactRepo
 	zoneSOSRepo    repository.ZoneSOSRepo
 	zoneSvc        ZoneService
+	tenantCode     string
 }
 
-//func (s *SOSContactServiceImpl) GetByUuid(contactUuid string) (*dto.SOSContactResponse, error) {
-//	contact, err := s.sosContactRepo.GetByContactAndZone(contactUuid)
-//	if err != nil {
-//		return nil, err
+//	func (s *SOSContactServiceImpl) GetByUuid(contactUuid string) (*dto.SOSContactResponse, error) {
+//		contact, err := s.sosContactRepo.GetByContactAndZone(contactUuid)
+//		if err != nil {
+//			return nil, err
+//		}
+//		return s.convertToDTO(contact), nil
 //	}
-//	return s.convertToDTO(contact), nil
-//}
+func (s *SOSContactServiceImpl) filterContacts(contacts []dto.SOSContactResponse, req dto.ListSOSContactRequest) []dto.SOSContactResponse {
+	var result []dto.SOSContactResponse
+	search := strings.ToLower(strings.TrimSpace(req.Search))
+
+	for _, c := range contacts {
+
+		if req.IsActive != nil && c.IsActive != *req.IsActive {
+			continue
+		}
+
+		if search != "" {
+			if !strings.Contains(strings.ToLower(c.Name), search) &&
+				!strings.Contains(strings.ToLower(c.Phone), search) {
+				continue
+			}
+		}
+
+		result = append(result, c)
+	}
+
+	return result
+}
+
+func paginate(data []dto.SOSContactResponse, page, pageSize int) []dto.SOSContactResponse {
+	if page <= 0 || pageSize <= 0 {
+		return data
+	}
+
+	start := (page - 1) * pageSize
+	if start >= len(data) {
+		return []dto.SOSContactResponse{}
+	}
+
+	end := start + pageSize
+	if end > len(data) {
+		end = len(data)
+	}
+
+	return data[start:end]
+}
 
 func (s *SOSContactServiceImpl) Create(req dto.CreateSOSContactRequest, userId uint, zoneUuid string) *response.Response {
 	newResponse := response.NewResponse()
@@ -60,7 +102,7 @@ func (s *SOSContactServiceImpl) Create(req dto.CreateSOSContactRequest, userId u
 		Role:     req.Role,
 		Phone:    normalizedPhone,
 		Note:     req.Note,
-		IsActive: enums.ContactActive,
+		IsActive: true,
 	}
 	sosContact.UUID = uuid.New().String()
 	sosContact.CreatedAt = time.Now()
@@ -80,6 +122,7 @@ func (s *SOSContactServiceImpl) Create(req dto.CreateSOSContactRequest, userId u
 	}
 	newResponse.Data = s.convertToDTO(&sosContact)
 	newResponse.MessageCode = response.SUS0000
+	_ = redisProvider.RevokeAllContacts(s.tenantCode, zone.UUID)
 	return newResponse
 }
 
@@ -96,14 +139,45 @@ func (s *SOSContactServiceImpl) ListByZone(req dto.ListSOSContactRequest, userId
 		return newResponse
 	}
 	req.Search = strings.TrimSpace(req.Search)
-	contacts, total, err := s.sosContactRepo.ListByZone(zone.ID, req.Page, req.PageSize, req.Search, req.IsAll, req.IsActive)
+	//contacts, total, err := s.sosContactRepo.ListByZone(zone.ID, req.Page, req.PageSize, req.Search, req.IsAll, req.IsActive)
+	//if err != nil {
+	//	newResponse.Err = err
+	//	return newResponse
+	//}
+	cachedContacts, err := redisProvider.GetFullContactKeys(s.tenantCode, req.ZoneUuid)
 	if err != nil {
 		newResponse.Err = err
 		return newResponse
 	}
+
+	var contacts []dto.SOSContactResponse
+
+	if cachedContacts == nil {
+
+		dbContacts, _, err := s.sosContactRepo.ListByZone(zone.ID, 1, 50, "", true, nil)
+		if err != nil {
+			newResponse.Err = err
+			return newResponse
+		}
+
+		for _, c := range dbContacts {
+			contacts = append(contacts, *s.convertToDTO(&c))
+		}
+
+		_ = redisProvider.SetContactKeys(s.tenantCode, req.ZoneUuid, contacts, 5*time.Minute)
+
+	} else {
+		contacts = cachedContacts
+	}
+
+	filtered := s.filterContacts(contacts, req)
+	total := int64(len(filtered))
+
 	var result []dto.SOSContactResponse
-	for _, contact := range contacts {
-		result = append(result, *s.convertToDTO(&contact))
+	if !req.IsAll {
+		result = paginate(filtered, req.Page, req.PageSize)
+	} else {
+		result = filtered
 	}
 	if req.IsAll {
 		newResponse.Data = &response.ListResponse{
@@ -162,10 +236,11 @@ func (s *SOSContactServiceImpl) Update(req dto.UpdateSOSContactRequest, contactU
 		contact.Phone = normalizedPhone
 	}
 	contact.Note = req.Note
-	if err = s.sosContactRepo.Update(contactUuid, contact); err != nil {
+	if err = s.sosContactRepo.Updates(contactUuid, contact); err != nil {
 		newResponse.Err = err
 		return newResponse
 	}
+	_ = redisProvider.RevokeAllContacts(s.tenantCode, zone.UUID)
 	newResponse.MessageCode = response.SUS0000
 	return newResponse
 }
@@ -188,17 +263,13 @@ func (s *SOSContactServiceImpl) ToggleStatus(req dto.ToggleSOSContactRequest, co
 		return newResponse
 	}
 	if req.IsActive != nil {
-		isActive := *req.IsActive
-		if !enums.IsValidStatus(isActive) {
-			newResponse.Err = response.ErrInvalidStatus
-			return newResponse
-		}
-		contact.IsActive = isActive
+		contact.IsActive = *req.IsActive
 	}
-	if err = s.sosContactRepo.Update(contactUuid, contact); err != nil {
+	if err = s.sosContactRepo.ToggleStatus(contactUuid, contact); err != nil {
 		newResponse.Err = err
 		return newResponse
 	}
+	_ = redisProvider.RevokeAllContacts(s.tenantCode, zone.UUID)
 	newResponse.MessageCode = response.SUS0000
 	return newResponse
 }
@@ -230,6 +301,7 @@ func (s *SOSContactServiceImpl) DeleteMany(req dto.DeleteSOSContactRequest, user
 		}
 		return newResponse
 	}
+	_ = redisProvider.RevokeAllContacts(s.tenantCode, zone.UUID)
 	newResponse.MessageCode = response.SUS0000
 	newResponse.Data = &response.DeleteResponse{
 		Deleted: deleted,
@@ -250,6 +322,6 @@ func (s *SOSContactServiceImpl) convertToDTO(contact *models.SOSContact) *dto.SO
 		UpdatedAt: contact.UpdatedAt,
 	}
 }
-func NewSOSService(sosRepo repository.SOSContactRepo, zoneSOSRepo repository.ZoneSOSRepo, zoneSvc ZoneService) SOSContactService {
-	return &SOSContactServiceImpl{sosContactRepo: sosRepo, zoneSOSRepo: zoneSOSRepo, zoneSvc: zoneSvc}
+func NewSOSService(sosRepo repository.SOSContactRepo, zoneSOSRepo repository.ZoneSOSRepo, zoneSvc ZoneService, tenantCode string) SOSContactService {
+	return &SOSContactServiceImpl{sosContactRepo: sosRepo, zoneSOSRepo: zoneSOSRepo, zoneSvc: zoneSvc, tenantCode: tenantCode}
 }

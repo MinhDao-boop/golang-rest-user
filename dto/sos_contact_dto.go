@@ -1,7 +1,6 @@
 package dto
 
 import (
-	"golang-rest-user/enums"
 	"time"
 )
 
@@ -32,7 +31,7 @@ type UpdateSOSContactRequest struct {
 }
 
 type ToggleSOSContactRequest struct {
-	IsActive *enums.SOSContactStatus `json:"is_active" patch:"true"`
+	IsActive *bool `json:"is_active" patch:"true"`
 }
 
 type DeleteSOSContactRequest struct {
@@ -40,13 +39,13 @@ type DeleteSOSContactRequest struct {
 }
 
 type SOSContactResponse struct {
-	ID        uint                   `json:"id"`
-	UUID      string                 `json:"uuid"`
-	Name      string                 `json:"name"`
-	Role      string                 `json:"role"`
-	Phone     string                 `json:"phone"`
-	Note      string                 `json:"note"`
-	IsActive  enums.SOSContactStatus `json:"is_active"`
-	CreatedAt time.Time              `json:"created_at"`
-	UpdatedAt time.Time              `json:"updated_at"`
+	ID        uint      `json:"id"`
+	UUID      string    `json:"uuid"`
+	Name      string    `json:"name"`
+	Role      string    `json:"role"`
+	Phone     string    `json:"phone"`
+	Note      string    `json:"note"`
+	IsActive  bool      `json:"is_active"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }

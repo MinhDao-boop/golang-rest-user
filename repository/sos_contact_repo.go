@@ -1,7 +1,6 @@
 package repository
 
 import (
-	"golang-rest-user/enums"
 	"golang-rest-user/models"
 	"golang-rest-user/utils"
 
@@ -11,7 +10,8 @@ import (
 type SOSContactRepo interface {
 	Create(*models.SOSContact) error
 	UpdateMap(string, map[string]interface{}) error
-	Update(string, *models.SOSContact) error
+	Updates(string, *models.SOSContact) error
+	ToggleStatus(string, *models.SOSContact) error
 	ListByZone(zoneId uint, page, pageSize int, search string, isAll bool, isActive *bool) ([]models.SOSContact, int64, error)
 	DeleteMany([]uint, uint) (int64, error)
 	GetByContactAndZone(string, uint) (*models.SOSContact, error)
@@ -22,7 +22,11 @@ type SOSContactRepoImpl struct {
 	db *gorm.DB
 }
 
-func (r *SOSContactRepoImpl) Update(uuid string, contact *models.SOSContact) error {
+func (r *SOSContactRepoImpl) ToggleStatus(uuid string, contact *models.SOSContact) error {
+	return r.db.Model(&models.SOSContact{}).Where("uuid = ?", uuid).Update("is_active", contact.IsActive).Error
+}
+
+func (r *SOSContactRepoImpl) Updates(uuid string, contact *models.SOSContact) error {
 	return r.db.Where("uuid = ?", uuid).Updates(contact).Error
 }
 
@@ -52,10 +56,6 @@ func (r *SOSContactRepoImpl) ListByZone(zoneId uint, page, pageSize int, search 
 		total = int64(len(sosContacts))
 	}
 	return sosContacts, total, nil
-}
-
-func (r *SOSContactRepoImpl) ToggleStatus(uuid string, status enums.SOSContactStatus) error {
-	return r.db.Model(models.SOSContact{}).Where("uuid = ?", uuid).Update("status", status).Error
 }
 
 func (r *SOSContactRepoImpl) GetByPhone(phone interface{}) (*models.SOSContact, error) {

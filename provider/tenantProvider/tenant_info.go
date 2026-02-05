@@ -64,7 +64,7 @@ func (t *TenantInfo) InitService() {
 
 	sosContactRepo := repository.NewSOSContactRepo(t.db)
 	zoneSOSRepo := repository.NewZoneSOSRepo(t.db)
-	t.SOSContactService = service.NewSOSService(sosContactRepo, zoneSOSRepo, t.ZoneService)
+	t.SOSContactService = service.NewSOSService(sosContactRepo, zoneSOSRepo, t.ZoneService, t.Info.Code)
 
 	zoneEscapeLinkRepo := repository.NewZoneEscapeLinkRepository(t.db)
 	t.ZoneEscapeLinkService = service.NewZoneEscapeLinkService(zoneEscapeLinkRepo, t.ZoneService)

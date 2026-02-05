@@ -2,8 +2,10 @@ package redisProvider
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"golang-rest-user/dto"
 	"os"
 	"time"
 
@@ -32,7 +34,7 @@ func GetClient() *redis.Client {
 
 func refreshKey(tenant string, userID uint, tokenHash string) string {
 	return fmt.Sprintf(
-		"auth:{%s}:user:%d:refresh:%s",
+		"{%s}:auth:user:%d:refresh:%s",
 		tenant,
 		userID,
 		tokenHash,
@@ -41,7 +43,7 @@ func refreshKey(tenant string, userID uint, tokenHash string) string {
 
 func userRefreshSetKey(tenant string, userID uint) string {
 	return fmt.Sprintf(
-		"auth:{%s}:user:%d:refresh_tokens",
+		"{%s}:auth:user:%d:refresh_tokens",
 		tenant,
 		userID,
 	)
@@ -49,10 +51,17 @@ func userRefreshSetKey(tenant string, userID uint) string {
 
 func userTokenVersion(tenant string, userID uint) string {
 	return fmt.Sprintf(
-		"auth:{%s}:user:%d:token_ver",
+		"{%s}:auth:user:%d:token_ver",
 		tenant,
 		userID,
 	)
+}
+
+func sosContact(tenant string, zoneId string) string {
+	return fmt.Sprintf(
+		"{%s}:sos_contact:zone:%s:all",
+		tenant,
+		zoneId)
 }
 
 func Create(tokenHash string, userID uint, tenantCode string, ttl time.Duration) error {
@@ -134,4 +143,39 @@ func GetTokenVer(userID uint, tenantCode string) int {
 func IncreaseTokenVer(userID uint, tenantCode string) error {
 	key := userTokenVersion(tenantCode, userID)
 	return client.Incr(ctx, key).Err()
+}
+
+func SetContactKeys(tenantCode string, zoneId string, contacts []dto.SOSContactResponse, ttl time.Duration) error {
+	key := sosContact(tenantCode, zoneId)
+
+	bytes, err := json.Marshal(contacts)
+	if err != nil {
+		return err
+	}
+
+	return client.Set(ctx, key, bytes, ttl).Err()
+}
+
+func GetFullContactKeys(tenantCode string, zoneId string) ([]dto.SOSContactResponse, error) {
+	key := sosContact(tenantCode, zoneId)
+
+	val, err := client.Get(ctx, key).Result()
+	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			return nil, nil // cache miss
+		}
+		return nil, err
+	}
+
+	var contacts []dto.SOSContactResponse
+	if err := json.Unmarshal([]byte(val), &contacts); err != nil {
+		return nil, err
+	}
+
+	return contacts, nil
+}
+
+func RevokeAllContacts(tenantCode, zoneId string) error {
+	key := sosContact(tenantCode, zoneId)
+	return client.Del(ctx, key).Err()
 }
