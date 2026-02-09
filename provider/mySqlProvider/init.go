@@ -41,7 +41,7 @@ func CreateInstanceDB(dbUser, dbPass, dbHost, dbPort, dbName string) (instance *
 		return nil, err
 	}
 
-	log.Printf("db %s connected", dbName)
+	fmt.Printf("db %s connected", dbName)
 
 	return instance, err
 }

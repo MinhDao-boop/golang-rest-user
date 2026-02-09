@@ -1,6 +1,8 @@
 package service
 
 import (
+	"encoding/json"
+	"fmt"
 	"golang-rest-user/dto"
 	"golang-rest-user/enums"
 	"golang-rest-user/models"
@@ -8,6 +10,7 @@ import (
 	"golang-rest-user/repository"
 	"golang-rest-user/response"
 	"golang-rest-user/utils"
+	"log"
 	"strings"
 	"time"
 
@@ -29,73 +32,33 @@ type SOSContactServiceImpl struct {
 	tenantCode     string
 }
 
-//	func (s *SOSContactServiceImpl) GetByUuid(contactUuid string) (*dto.SOSContactResponse, error) {
-//		contact, err := s.sosContactRepo.GetByContactAndZone(contactUuid)
-//		if err != nil {
-//			return nil, err
-//		}
-//		return s.convertToDTO(contact), nil
-//	}
-func (s *SOSContactServiceImpl) filterContacts(contacts []dto.SOSContactResponse, req dto.ListSOSContactRequest) []dto.SOSContactResponse {
-	var result []dto.SOSContactResponse
-	search := strings.ToLower(strings.TrimSpace(req.Search))
-
-	for _, c := range contacts {
-
-		if req.IsActive != nil && c.IsActive != *req.IsActive {
-			continue
-		}
-
-		if search != "" {
-			if !strings.Contains(strings.ToLower(c.Name), search) &&
-				!strings.Contains(strings.ToLower(c.Phone), search) {
-				continue
-			}
-		}
-
-		result = append(result, c)
-	}
-
-	return result
-}
-
-func paginate(data []dto.SOSContactResponse, page, pageSize int) []dto.SOSContactResponse {
-	if page <= 0 || pageSize <= 0 {
-		return data
-	}
-
-	start := (page - 1) * pageSize
-	if start >= len(data) {
-		return []dto.SOSContactResponse{}
-	}
-
-	end := start + pageSize
-	if end > len(data) {
-		end = len(data)
-	}
-
-	return data[start:end]
+func sosContact(tenant, zoneId string, userId uint) string {
+	key := fmt.Sprintf(
+		"{%s}:user:%d:zone:%s:sos_contact",
+		tenant, userId, zoneId)
+	return key
 }
 
 func (s *SOSContactServiceImpl) Create(req dto.CreateSOSContactRequest, userId uint, zoneUuid string) *response.Response {
-	newResponse := response.NewResponse()
+	resp := response.NewResponse()
+	key := sosContact(s.tenantCode, zoneUuid, userId)
 	normalizedPhone, err := utils.NormalizePhone(req.Phone)
 	if err != nil {
-		newResponse.Err = err
-		return newResponse
+		resp.Err = err
+		return resp
 	}
 	//if !enums.IsValidRoleKey(req.Role) {
 	//	return nil, errors.New("invalid role")
 	//}
 	zone, err := s.zoneSvc.GetByUUID(zoneUuid)
 	if err != nil {
-		newResponse.Err = err
-		return newResponse
+		resp.Err = err
+		return resp
 	}
 	if !s.zoneSvc.CheckPermission(zone.ID, userId, enums.UserEditor) {
-		newResponse.Err = response.ErrForbidden
-		newResponse.MessageCode = response.FBD0000
-		return newResponse
+		resp.Err = response.ErrForbidden
+		resp.MessageCode = response.FBD0000
+		return resp
 	}
 	sosContact := models.SOSContact{
 		Name:     req.Name,
@@ -107,8 +70,8 @@ func (s *SOSContactServiceImpl) Create(req dto.CreateSOSContactRequest, userId u
 	sosContact.UUID = uuid.New().String()
 	sosContact.CreatedAt = time.Now()
 	if err = s.sosContactRepo.Create(&sosContact); err != nil {
-		newResponse.Err = err
-		return newResponse
+		resp.Err = err
+		return resp
 	}
 	mapping := &models.ZoneSOS{
 		ZoneID:       zone.ID,
@@ -117,104 +80,90 @@ func (s *SOSContactServiceImpl) Create(req dto.CreateSOSContactRequest, userId u
 	mapping.UUID = uuid.New().String()
 	mapping.CreatedAt = time.Now()
 	if err = s.zoneSOSRepo.Create(mapping); err != nil {
-		newResponse.Err = err
-		return newResponse
+		resp.Err = err
+		return resp
 	}
-	newResponse.Data = s.convertToDTO(&sosContact)
-	newResponse.MessageCode = response.SUS0000
-	_ = redisProvider.RevokeAllContacts(s.tenantCode, zone.UUID)
-	return newResponse
+	err = redisProvider.DeleteCachePattern(key)
+	if err != nil {
+		log.Println(err)
+	}
+	resp.Data = s.convertToDTO(&sosContact)
+	resp.MessageCode = response.SUS0000
+	return resp
 }
 
 func (s *SOSContactServiceImpl) ListByZone(req dto.ListSOSContactRequest, userId uint) *response.Response {
-	newResponse := response.NewResponse()
+	resp := response.NewResponse()
 	zone, err := s.zoneSvc.GetByUUID(req.ZoneUuid)
 	if err != nil {
-		newResponse.Err = err
-		return newResponse
+		resp.Err = err
+		return resp
 	}
 	if !s.zoneSvc.CheckPermission(zone.ID, userId, enums.UserViewer) {
-		newResponse.Err = response.ErrForbidden
-		newResponse.MessageCode = response.FBD0000
-		return newResponse
+		resp.Err = response.ErrForbidden
+		resp.MessageCode = response.FBD0000
+		return resp
 	}
-	req.Search = strings.TrimSpace(req.Search)
-	//contacts, total, err := s.sosContactRepo.ListByZone(zone.ID, req.Page, req.PageSize, req.Search, req.IsAll, req.IsActive)
-	//if err != nil {
-	//	newResponse.Err = err
-	//	return newResponse
-	//}
-	cachedContacts, err := redisProvider.GetFullContactKeys(s.tenantCode, req.ZoneUuid)
-	if err != nil {
-		newResponse.Err = err
-		return newResponse
+	key := sosContact(s.tenantCode, zone.UUID, userId)
+	key = fmt.Sprintf("%s:page=%d&page_size=%d:", key, req.Page, req.PageSize)
+	if req.Search != "" {
+		key = fmt.Sprintf("%s&search=%s", key, req.Search)
 	}
-
-	var contacts []dto.SOSContactResponse
-
-	if cachedContacts == nil {
-
-		dbContacts, _, err := s.sosContactRepo.ListByZone(zone.ID, 1, 50, "", true, nil)
-		if err != nil {
-			newResponse.Err = err
-			return newResponse
+	if req.IsActive != nil {
+		status := "inactive"
+		if *req.IsActive {
+			status = "active"
 		}
-
-		for _, c := range dbContacts {
-			contacts = append(contacts, *s.convertToDTO(&c))
-		}
-
-		_ = redisProvider.SetContactKeys(s.tenantCode, req.ZoneUuid, contacts, 5*time.Minute)
-
-	} else {
-		contacts = cachedContacts
+		key = fmt.Sprintf("%s&status=%s", key, status)
 	}
-
-	filtered := s.filterContacts(contacts, req)
-	total := int64(len(filtered))
-
 	var result []dto.SOSContactResponse
-	if !req.IsAll {
-		result = paginate(filtered, req.Page, req.PageSize)
-	} else {
-		result = filtered
+	value, err := redisProvider.GetCache(key)
+	if err != nil {
+		log.Println(err)
 	}
-	if req.IsAll {
-		newResponse.Data = &response.ListResponse{
-			Page:     req.Page,
-			PageSize: int(total),
-			Total:    total,
-			Contents: result,
+	err = json.Unmarshal(value, &result)
+	if value == nil || err != nil {
+		req.Search = strings.TrimSpace(req.Search)
+		contacts, _, err := s.sosContactRepo.ListByZone(zone.ID, req.Page, req.PageSize, req.Search, false, req.IsActive)
+		if err != nil {
+			resp.Err = err
+			return resp
 		}
-		newResponse.MessageCode = response.SUS0000
-		return newResponse
+		for _, contact := range contacts {
+			result = append(result, *s.convertToDTO(&contact))
+		}
+		if err = redisProvider.SetCache(key, result, 300, true); err != nil {
+			log.Println(err)
+		}
 	}
-	newResponse.Data = &response.ListResponse{
+	total := len(result)
+	resp.Data = &response.ListResponse{
 		Page:     req.Page,
 		PageSize: req.PageSize,
-		Total:    total,
+		Total:    int64(total),
 		Contents: result,
 	}
-	newResponse.MessageCode = response.SUS0000
-	return newResponse
+	resp.MessageCode = response.SUS0000
+	return resp
 }
 
 func (s *SOSContactServiceImpl) Update(req dto.UpdateSOSContactRequest, contactUuid, zoneUuid string, userId uint) *response.Response {
-	newResponse := response.NewResponse()
+	resp := response.NewResponse()
+	key := sosContact(s.tenantCode, zoneUuid, userId)
 	zone, err := s.zoneSvc.GetByUUID(zoneUuid)
 	if err != nil {
-		newResponse.Err = err
-		return newResponse
+		resp.Err = err
+		return resp
 	}
 	contact, err := s.sosContactRepo.GetByContactAndZone(contactUuid, zone.ID)
 	if err != nil {
-		newResponse.Err = err
-		return newResponse
+		resp.Err = err
+		return resp
 	}
 	if !s.zoneSvc.CheckPermission(zone.ID, userId, enums.UserEditor) {
-		newResponse.Err = response.ErrForbidden
-		newResponse.MessageCode = response.FBD0000
-		return newResponse
+		resp.Err = response.ErrForbidden
+		resp.MessageCode = response.FBD0000
+		return resp
 	}
 	if req.Name != nil {
 		contact.Name = *req.Name
@@ -230,83 +179,94 @@ func (s *SOSContactServiceImpl) Update(req dto.UpdateSOSContactRequest, contactU
 		phone := *req.Phone
 		normalizedPhone, err := utils.NormalizePhone(phone)
 		if err != nil {
-			newResponse.Err = err
-			return newResponse
+			resp.Err = err
+			return resp
 		}
 		contact.Phone = normalizedPhone
 	}
 	contact.Note = req.Note
 	if err = s.sosContactRepo.Updates(contactUuid, contact); err != nil {
-		newResponse.Err = err
-		return newResponse
+		resp.Err = err
+		return resp
 	}
-	_ = redisProvider.RevokeAllContacts(s.tenantCode, zone.UUID)
-	newResponse.MessageCode = response.SUS0000
-	return newResponse
+	err = redisProvider.DeleteCachePattern(key)
+	if err != nil {
+		log.Println(err)
+	}
+	resp.MessageCode = response.SUS0000
+	return resp
 }
 
 func (s *SOSContactServiceImpl) ToggleStatus(req dto.ToggleSOSContactRequest, contactUuid, zoneUuid string, userId uint) *response.Response {
-	newResponse := response.NewResponse()
+	resp := response.NewResponse()
+	key := sosContact(s.tenantCode, zoneUuid, userId)
 	zone, err := s.zoneSvc.GetByUUID(zoneUuid)
 	if err != nil {
-		newResponse.Err = err
-		return newResponse
+		resp.Err = err
+		return resp
 	}
 	if !s.zoneSvc.CheckPermission(zone.ID, userId, enums.UserEditor) {
-		newResponse.Err = response.ErrForbidden
-		newResponse.MessageCode = response.FBD0000
-		return newResponse
+		resp.Err = response.ErrForbidden
+		resp.MessageCode = response.FBD0000
+		return resp
 	}
 	contact, err := s.sosContactRepo.GetByContactAndZone(contactUuid, zone.ID)
 	if err != nil {
-		newResponse.Err = err
-		return newResponse
+		resp.Err = err
+		return resp
 	}
 	if req.IsActive != nil {
 		contact.IsActive = *req.IsActive
 	}
 	if err = s.sosContactRepo.ToggleStatus(contactUuid, contact); err != nil {
-		newResponse.Err = err
-		return newResponse
+		resp.Err = err
+		return resp
 	}
-	_ = redisProvider.RevokeAllContacts(s.tenantCode, zone.UUID)
-	newResponse.MessageCode = response.SUS0000
-	return newResponse
+	err = redisProvider.DeleteCachePattern(key)
+	if err != nil {
+		log.Println(err)
+	}
+	resp.MessageCode = response.SUS0000
+	return resp
 }
 
 func (s *SOSContactServiceImpl) DeleteMany(req dto.DeleteSOSContactRequest, userId uint, zoneUuid string) *response.Response {
 	var deleted int64
-	newResponse := response.NewResponse()
+	key := sosContact(s.tenantCode, zoneUuid, userId)
+	resp := response.NewResponse()
 	zone, err := s.zoneSvc.GetByUUID(zoneUuid)
 	if err != nil {
-		newResponse.Err = err
-		newResponse.Data = &response.DeleteResponse{
+		resp.Err = err
+		resp.Data = &response.DeleteResponse{
 			Deleted: deleted,
 		}
-		return newResponse
+		return resp
 	}
 	if !s.zoneSvc.CheckPermission(zone.ID, userId, enums.UserEditor) {
-		newResponse.Err = response.ErrForbidden
-		newResponse.MessageCode = response.FBD0000
-		newResponse.Data = &response.DeleteResponse{
+		resp.Err = response.ErrForbidden
+		resp.MessageCode = response.FBD0000
+		resp.Data = &response.DeleteResponse{
 			Deleted: deleted,
 		}
-		return newResponse
+		return resp
 	}
 	deleted, err = s.sosContactRepo.DeleteMany(req.Ids, zone.ID)
 	if err != nil {
-		newResponse.Err = err
-		newResponse.Data = &response.DeleteResponse{
+		resp.Err = err
+		resp.Data = &response.DeleteResponse{
 			Deleted: deleted,
 		}
-		return newResponse
+		return resp
 	}
-	_ = redisProvider.RevokeAllContacts(s.tenantCode, zone.UUID)
-	newResponse.MessageCode = response.SUS0000
-	newResponse.Data = &response.DeleteResponse{
+	err = redisProvider.DeleteCachePattern(key)
+	if err != nil {
+		log.Println(err)
+	}
+	resp.MessageCode = response.SUS0000
+	resp.Data = &response.DeleteResponse{
 		Deleted: deleted,
 	}
-	return newResponse
+	return resp
 }
 
 func (s *SOSContactServiceImpl) convertToDTO(contact *models.SOSContact) *dto.SOSContactResponse {

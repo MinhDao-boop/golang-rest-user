@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"golang-rest-user/dto"
 	"os"
 	"time"
 
@@ -55,13 +54,6 @@ func userTokenVersion(tenant string, userID uint) string {
 		tenant,
 		userID,
 	)
-}
-
-func sosContact(tenant string, zoneId string) string {
-	return fmt.Sprintf(
-		"{%s}:sos_contact:zone:%s:all",
-		tenant,
-		zoneId)
 }
 
 func Create(tokenHash string, userID uint, tenantCode string, ttl time.Duration) error {
@@ -145,37 +137,40 @@ func IncreaseTokenVer(userID uint, tenantCode string) error {
 	return client.Incr(ctx, key).Err()
 }
 
-func SetContactKeys(tenantCode string, zoneId string, contacts []dto.SOSContactResponse, ttl time.Duration) error {
-	key := sosContact(tenantCode, zoneId)
-
-	bytes, err := json.Marshal(contacts)
+func GetCache(key string) ([]byte, error) {
+	value, err := client.Get(ctx, key).Result()
 	if err != nil {
-		return err
+		return nil, err
 	}
-
-	return client.Set(ctx, key, bytes, ttl).Err()
+	return []byte(value), nil
 }
 
-func GetFullContactKeys(tenantCode string, zoneId string) ([]dto.SOSContactResponse, error) {
-	key := sosContact(tenantCode, zoneId)
-
-	val, err := client.Get(ctx, key).Result()
-	if err != nil {
-		if errors.Is(err, redis.Nil) {
-			return nil, nil // cache miss
+func SetCache(key string, value interface{}, duration int, isJson bool) error {
+	if isJson {
+		temp, err := json.Marshal(value)
+		if err != nil {
+			return err
 		}
-		return nil, err
+		return client.Set(ctx, key, temp, time.Second*time.Duration(duration)).Err()
 	}
-
-	var contacts []dto.SOSContactResponse
-	if err := json.Unmarshal([]byte(val), &contacts); err != nil {
-		return nil, err
-	}
-
-	return contacts, nil
+	return client.Set(ctx, key, value, time.Second*time.Duration(duration)).Err()
 }
 
-func RevokeAllContacts(tenantCode, zoneId string) error {
-	key := sosContact(tenantCode, zoneId)
-	return client.Del(ctx, key).Err()
+func DeleteCache(key string) error {
+	_, err := client.Del(ctx, key).Result()
+	if errors.Is(err, redis.Nil) {
+		return nil
+	}
+	return err
+}
+
+func DeleteCachePattern(key string) error {
+	key = fmt.Sprintf("%s:*", key)
+	iter := client.Scan(ctx, 0, key, 0).Iterator()
+	for iter.Next(ctx) {
+		if err := DeleteCache(iter.Val()); err != nil {
+			return err
+		}
+	}
+	return iter.Err()
 }
