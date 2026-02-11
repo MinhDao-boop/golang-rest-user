@@ -94,6 +94,7 @@ func (s *SOSContactServiceImpl) Create(req dto.CreateSOSContactRequest, userId u
 
 func (s *SOSContactServiceImpl) ListByZone(req dto.ListSOSContactRequest, userId uint) *response.Response {
 	resp := response.NewResponse()
+	var cacheData response.CacheResponse
 	zone, err := s.zoneSvc.GetByUUID(req.ZoneUuid)
 	if err != nil {
 		resp.Err = err
@@ -121,10 +122,10 @@ func (s *SOSContactServiceImpl) ListByZone(req dto.ListSOSContactRequest, userId
 	if err != nil {
 		log.Println(err)
 	}
-	err = json.Unmarshal(value, &result)
+	err = json.Unmarshal(value, &cacheData)
 	if value == nil || err != nil {
 		req.Search = strings.TrimSpace(req.Search)
-		contacts, _, err := s.sosContactRepo.ListByZone(zone.ID, req.Page, req.PageSize, req.Search, false, req.IsActive)
+		contacts, total, err := s.sosContactRepo.ListByZone(zone.ID, req.Page, req.PageSize, req.Search, false, req.IsActive)
 		if err != nil {
 			resp.Err = err
 			return resp
@@ -132,16 +133,19 @@ func (s *SOSContactServiceImpl) ListByZone(req dto.ListSOSContactRequest, userId
 		for _, contact := range contacts {
 			result = append(result, *s.convertToDTO(&contact))
 		}
-		if err = redisProvider.SetCache(key, result, 300, true); err != nil {
+		cacheData = response.CacheResponse{
+			Contents: result,
+			Total:    total,
+		}
+		if err = redisProvider.SetCache(key, cacheData, 300, true); err != nil {
 			log.Println(err)
 		}
 	}
-	total := len(result)
 	resp.Data = &response.ListResponse{
 		Page:     req.Page,
 		PageSize: req.PageSize,
-		Total:    int64(total),
-		Contents: result,
+		Total:    cacheData.Total,
+		Contents: cacheData.Contents,
 	}
 	resp.MessageCode = response.SUS0000
 	return resp

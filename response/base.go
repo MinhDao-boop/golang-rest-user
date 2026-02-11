@@ -15,6 +15,11 @@ type ListResponse struct {
 	Contents interface{} `form:"contents,default=50" json:"contents"`
 }
 
+type CacheResponse struct {
+	Contents interface{} `json:"contents"`
+	Total    int64       `json:"total"`
+}
+
 type DeleteResponse struct {
 	Deleted int64 `json:"deleted"`
 }

@@ -44,9 +44,6 @@ func (r *SOSContactRepoImpl) ListByZone(zoneId uint, page, pageSize int, search 
 		query.Where("sos_contacts.is_active = ?", *isActive)
 	}
 	if !isAll {
-		if err := query.Count(&total).Error; err != nil {
-			return nil, 0, err
-		}
 		query = query.Scopes(utils.PaginateGORM(page, pageSize))
 	}
 	if err := query.Find(&sosContacts).Error; err != nil {
@@ -54,6 +51,9 @@ func (r *SOSContactRepoImpl) ListByZone(zoneId uint, page, pageSize int, search 
 	}
 	if isAll {
 		total = int64(len(sosContacts))
+	}
+	if err := r.db.Model(&models.ZoneSOS{}).Where("zone_id = ?", zoneId).Count(&total).Error; err != nil {
+		return nil, 0, err
 	}
 	return sosContacts, total, nil
 }
