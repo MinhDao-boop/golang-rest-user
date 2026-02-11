@@ -49,12 +49,13 @@ func (r *SOSContactRepoImpl) ListByZone(zoneId uint, page, pageSize int, search 
 	if err := query.Find(&sosContacts).Error; err != nil {
 		return nil, 0, err
 	}
-	if isAll {
-		total = int64(len(sosContacts))
-	}
 	if err := r.db.Model(&models.ZoneSOS{}).Where("zone_id = ?", zoneId).Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
+	if isAll {
+		total = int64(len(sosContacts))
+	}
+
 	return sosContacts, total, nil
 }
 
